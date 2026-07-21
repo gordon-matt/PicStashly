@@ -1,6 +1,7 @@
 namespace PicStashly.Controllers.Api;
 
 [ApiController]
+[Authorize(Roles = Constants.Roles.Administrator)]
 [Route("api/admin")]
 public class AdminApiController : ControllerBase
 {

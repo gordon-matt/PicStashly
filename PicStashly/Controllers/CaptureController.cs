@@ -5,6 +5,7 @@ namespace PicStashly.Controllers;
 /// query string; the page then posts to <c>/api/capture</c> same-origin (avoiding any CORS setup)
 /// and shows the result, including the dedup prompt.
 /// </summary>
+[Authorize]
 [Route("capture")]
 public class CaptureController : Controller
 {

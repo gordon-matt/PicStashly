@@ -92,6 +92,24 @@ body {
   outline-offset: -3px;
 }
 
+.masonry-item .item-delete {
+  position: absolute;
+  top: 0.4rem;
+  right: 0.4rem;
+  z-index: 2;
+  padding: 0.15rem 0.4rem;
+  opacity: 0;
+  transition: opacity 0.15s ease-in-out;
+}
+
+.masonry-item:hover .item-delete {
+  opacity: 0.85;
+}
+
+.masonry-item .item-delete:hover {
+  opacity: 1;
+}
+
 /* ── Sticky filter bar ────────────────────────────────────────────────── */
 
 .filter-bar {

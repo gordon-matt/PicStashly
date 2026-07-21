@@ -1,0 +1,14 @@
+@page
+@{
+    ViewData["Title"] = "Registration disabled";
+}
+
+<h1>@ViewData["Title"]</h1>
+<div class="alert alert-info">
+    <p>PicStashly is a single-user app — self-registration is disabled.</p>
+    <p>
+        Sign in with the admin account created on first run (see <code>SeedAdmin</code> in
+        <code>appsettings.json</code>), or ask the server owner for access.
+    </p>
+    <a class="btn btn-primary" asp-area="Identity" asp-page="/Account/Login">Go to login</a>
+</div>

@@ -23,8 +23,19 @@ builder.Services.AddPicStashlyServices(builder.Configuration);
 
 builder.Services.AddDatabaseDeveloperPageExceptionFilter();
 
+// ── Authentication provider selection ────────────────────────────────────────
+// Set "Authentication:Provider" to "Keycloak" to use Keycloak instead of the
+// built-in ASP.NET Core Identity system. See appsettings.json for configuration
+// keys and docs/KEYCLOAK_SETUP.md for Keycloak-side setup instructions.
+string authProviderName = builder.Configuration.GetValue<string>("Authentication:Provider") ?? "Identity";
+bool useKeycloak = authProviderName.Equals("Keycloak", StringComparison.OrdinalIgnoreCase);
+
+builder.Services.AddPicStashlyAuthentication(builder.Configuration, useKeycloak);
+
 builder.Services.AddControllersWithViews()
     .AddNewtonsoftJson();
+
+builder.Services.AddRazorPages();
 
 // Allow large multi-file upload batches (per-file size is validated in the ingest pipeline).
 builder.Services.Configure<FormOptions>(options =>
@@ -33,6 +44,13 @@ builder.Services.Configure<FormOptions>(options =>
 });
 
 var app = builder.Build();
+
+// When using Keycloak behind a reverse proxy (HTTPS → app), process forwarded headers first
+// so the app sees the original scheme (https) and host. Must run before other middleware.
+if (useKeycloak)
+{
+    app.UseForwardedHeaders();
+}
 
 app.UseSerilogRequestLogging();
 
@@ -47,7 +65,15 @@ else
     app.UseHsts();
 }
 
-app.UseHttpsRedirection();
+// When using Keycloak behind a reverse proxy, the app typically listens only on HTTP;
+// the proxy terminates HTTPS. UseHttpsRedirection would try to redirect but cannot
+// determine an HTTPS port, causing "Failed to determine the https port for redirect."
+// Rely on the proxy and forwarded headers instead.
+if (!useKeycloak)
+{
+    app.UseHttpsRedirection();
+}
+
 app.UseStaticFiles();
 
 // Serve stored images and thumbnails from the storage folder under /media (images only).
@@ -79,6 +105,7 @@ app.UseStaticFiles();
 
 app.UseRouting();
 
+app.UseAuthentication();
 app.UseAuthorization();
 
 // Use fingerprinted static assets only in Development (avoids 500s in Docker when manifest paths differ)
@@ -95,11 +122,17 @@ if (app.Environment.IsDevelopment())
     defaultRoute.WithStaticAssets();
 }
 
+var razorPages = app.MapRazorPages();
+if (app.Environment.IsDevelopment())
+{
+    razorPages.WithStaticAssets();
+}
+
 await using (var scope = app.Services.CreateAsyncScope())
 {
     try
     {
-        await DbInitializer.InitializeAsync(scope.ServiceProvider);
+        await DbInitializer.InitializeAsync(scope.ServiceProvider, app.Configuration, useKeycloak);
     }
     catch (Exception ex)
     {

@@ -1,5 +1,6 @@
 namespace PicStashly.Controllers;
 
+[Authorize]
 [Route("tags")]
 public class TagsController : Controller
 {

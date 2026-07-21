@@ -2,6 +2,7 @@ namespace PicStashly.Controllers.Api;
 
 /// <summary>Bookmarklet capture endpoint: accepts an image URL + page URL, downloads and ingests the image.</summary>
 [ApiController]
+[Authorize]
 [Route("api/capture")]
 public class CaptureApiController : ControllerBase
 {

@@ -83,6 +83,11 @@
             <input type="checkbox" class="form-check-input select-check"
                    data-bind="visible: $parent.selectionMode, checked: $parent.isSelected($data),
                               event: { click: function (d, e) { e.stopPropagation(); $parent.toggleSelected($data); return true; } }" />
+            <button type="button" class="btn btn-sm btn-danger item-delete" title="Delete"
+                    data-bind="visible: !$parent.selectionMode(),
+                               event: { click: function (d, e) { e.stopPropagation(); $parent.deleteItem($data); return true; } }">
+                <i class="bi bi-trash"></i>
+            </button>
             <img loading="lazy" data-bind="attr: { src: thumbnailUrl, alt: fileName }" />
             <div class="item-tags">
                 <!-- ko foreach: tags -->

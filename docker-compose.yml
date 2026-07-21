@@ -17,6 +17,17 @@ services:
       # To use PostgreSQL instead, comment the two lines above and uncomment:
       # - Database__Provider=Npgsql
       # - ConnectionStrings__DefaultConnection=Host=postgres;Database=picstashly;Username=picstashly;Password=change-me
+      # ── Authentication (optional) ────────────────────────────────────────────
+      # By default the app uses its built-in ASP.NET Core Identity (local admin account,
+      # see SeedAdmin__Email / SeedAdmin__Password below). To use Keycloak for centralised
+      # login instead, set Authentication__Provider to "Keycloak" and fill in Authority +
+      # ClientSecret (uncomment the "keycloak" service below too). See docs/KEYCLOAK_SETUP.md.
+      # - SeedAdmin__Email=admin@example.com
+      # - SeedAdmin__Password=${ADMIN_PASSWORD}
+      # - Authentication__Provider=Keycloak
+      # - Authentication__Keycloak__Authority=http://host.docker.internal:8081/realms/picstashly
+      # - Authentication__Keycloak__ClientId=picstashly
+      # - Authentication__Keycloak__ClientSecret=${KEYCLOAK_CLIENT_SECRET}
     volumes:
       - picstashly-data:/app/data
 
@@ -32,6 +43,21 @@ services:
   #   volumes:
   #     - picstashly-pgdata:/var/lib/postgresql/data
 
+  # Optional Keycloak — uncomment together with the Authentication__Keycloak__* settings above.
+  # After first start, open http://localhost:8081 and follow docs/KEYCLOAK_SETUP.md.
+  # keycloak:
+  #   image: quay.io/keycloak/keycloak:26.5.5
+  #   container_name: keycloak
+  #   ports:
+  #     - "8081:8080"
+  #   environment:
+  #     - KC_BOOTSTRAP_ADMIN_USERNAME=admin
+  #     - KC_BOOTSTRAP_ADMIN_PASSWORD=${KEYCLOAK_ADMIN_PASSWORD:-admin}
+  #   command: start-dev
+  #   volumes:
+  #     - picstashly-keycloak:/opt/keycloak/data
+
 volumes:
   picstashly-data:
   # picstashly-pgdata:
+  # picstashly-keycloak:

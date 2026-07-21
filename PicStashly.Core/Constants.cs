@@ -23,4 +23,10 @@ public static class Constants
 
     /// <summary>Request path prefix under which stored files are served via static files middleware.</summary>
     public const string MediaRequestPath = "/media";
+
+    public static class Roles
+    {
+        public const string Administrator = "Administrator";
+        public const string User = "User";
+    }
 }

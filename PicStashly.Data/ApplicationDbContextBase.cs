@@ -1,8 +1,11 @@
+using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
+
 namespace PicStashly.Data;
 
-public abstract class ApplicationDbContextBase : DbContext
+public abstract class ApplicationDbContextBase : IdentityDbContext<ApplicationUser, ApplicationRole, string>
 {
-    protected ApplicationDbContextBase(DbContextOptions options) : base(options)
+    protected ApplicationDbContextBase(DbContextOptions options)
+        : base(options)
     {
     }
 

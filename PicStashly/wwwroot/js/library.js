@@ -297,32 +297,52 @@ class LibraryViewModel {
 
         if (!confirm(`Delete "${image.fileName}"? This cannot be undone.`)) return;
 
+        const deleted = await this._deleteImage(image);
+        if (!deleted) return;
+
+        const items = this.images();
+        const index = items.findIndex(i => i.id === image.id);
+        const next = items[index + 1] || items[index - 1] || null;
+
+        this.images.remove(i => i.id === image.id);
+        this.totalCount(Math.max(0, this.totalCount() - 1));
+
+        if (next) {
+            this.lightboxImage(next);
+            this._initLightboxTags(next);
+        } else {
+            this.closeLightbox();
+        }
+    };
+
+    // Quick delete straight from the grid tile, without opening the lightbox.
+    deleteItem = async (image) => {
+        if (!confirm(`Delete "${image.fileName}"? This cannot be undone.`)) return;
+
+        const deleted = await this._deleteImage(image);
+        if (!deleted) return;
+
+        this.images.remove(i => i.id === image.id);
+        this.selectedIds.remove(image.id);
+        this.totalCount(Math.max(0, this.totalCount() - 1));
+    };
+
+    _deleteImage = async (image) => {
         try {
             const response = await fetch(`/api/images/${image.id}`, { method: 'DELETE' });
             const data = await response.json().catch(() => ({}));
 
             if (response.ok) {
-                const items = this.images();
-                const index = items.findIndex(i => i.id === image.id);
-                const next = items[index + 1] || items[index - 1] || null;
-
-                this.images.remove(i => i.id === image.id);
-                this.totalCount(Math.max(0, this.totalCount() - 1));
-
-                if (next) {
-                    this.lightboxImage(next);
-                    this._initLightboxTags(next);
-                } else {
-                    this.closeLightbox();
-                }
-
                 toast.success(data.message || 'Image deleted.');
-            } else {
-                toast.error(data.message || 'Failed to delete image.');
+                return true;
             }
+
+            toast.error(data.message || 'Failed to delete image.');
+            return false;
         } catch (error) {
             console.error('Error deleting image:', error);
             toast.error('Failed to delete image.');
+            return false;
         }
     };
 

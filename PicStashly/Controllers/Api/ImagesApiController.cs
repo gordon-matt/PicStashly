@@ -1,6 +1,7 @@
 namespace PicStashly.Controllers.Api;
 
 [ApiController]
+[Authorize]
 [Route("api/images")]
 public class ImagesApiController : ControllerBase
 {

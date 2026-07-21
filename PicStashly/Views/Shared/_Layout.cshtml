@@ -56,12 +56,16 @@
                                 <i class="bi bi-tags"></i> Tags
                             </a>
                         </li>
-                        <li class="nav-item">
-                            <a class="nav-link" asp-area="" asp-controller="Admin" asp-action="Index">
-                                <i class="bi bi-gear"></i> Admin
-                            </a>
-                        </li>
+                        @if (User.IsInRole(Constants.Roles.Administrator))
+                        {
+                            <li class="nav-item">
+                                <a class="nav-link" asp-area="" asp-controller="Admin" asp-action="Index">
+                                    <i class="bi bi-gear"></i> Admin
+                                </a>
+                            </li>
+                        }
                     </ul>
+                    <partial name="_LoginPartial" />
                 </div>
             </div>
         </nav>

@@ -1,5 +1,6 @@
 namespace PicStashly.Controllers;
 
+[Authorize]
 [Route("upload")]
 public class UploadController : Controller
 {

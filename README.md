@@ -20,6 +20,10 @@ Think of it as a personal visual search engine, not a photo manager.
 - **Automatic downscaling**: images larger than the configured maximum are resized on upload
   (aspect ratio preserved, original format kept); WebP thumbnails are generated for the grid.
 - **Lightbox** with keyboard navigation: `←`/`→` prev/next, `t` focus tags, `Esc` close, `Del` delete.
+- **Delete** from the grid (hover an image tile), the lightbox, or the image details page.
+- **Authentication**: the whole app sits behind a login screen — built-in ASP.NET Core Identity
+  by default (a local admin account is created on first run), or Keycloak for centralised
+  single sign-on if you already run it for other self-hosted apps.
 
 ## Tech stack
 
@@ -47,6 +51,23 @@ environment variables in Docker):
 
 Migrations for each provider live in the matching `PicStashly.Data.{Provider}` project and are
 applied automatically on startup.
+
+## Authentication
+
+PicStashly is a single-user app, but since it's typically exposed on your home network (or
+further), the whole app sits behind a login screen so it isn't reachable unauthenticated.
+
+By default it uses **built-in ASP.NET Core Identity**: a local admin account is created
+automatically on first run (`admin@picstashly.local` / `Admin@123` — override via `SeedAdmin`
+in `appsettings.json`, User Secrets, or `SeedAdmin__Email` / `SeedAdmin__Password` env vars).
+Change the password after first login via the **Manage account** link in the navbar.
+
+If you already run **Keycloak** for other self-hosted apps, PicStashly can delegate login to
+it instead — set `Authentication:Provider` to `Keycloak` (see the commented block in
+`appsettings.json` or `docker-compose.yml`). See [`docs/KEYCLOAK_SETUP.md`](docs/KEYCLOAK_SETUP.md)
+for full setup instructions. The `Administrator` role (local Identity or a Keycloak realm role)
+is required for the Admin page and its maintenance endpoints; any authenticated user can browse,
+upload, and tag.
 
 ## Configuration
 
@@ -98,8 +119,8 @@ Data (SQLite database + images) is stored in the `picstashly-data` volume. See
 
 ```
 PicStashly/              ASP.NET Core MVC web app (controllers, views, wwwroot)
-PicStashly.Core/         Constants
-PicStashly.Data/         Entities + ApplicationDbContextBase (provider-agnostic)
+PicStashly.Core/         Constants (incl. Roles)
+PicStashly.Data/         Entities (incl. ApplicationUser/Role) + ApplicationDbContextBase (provider-agnostic)
 PicStashly.Data.Npgsql/  PostgreSQL DbContext, factory + migrations
 PicStashly.Data.MySql/   MySQL DbContext, factory + migrations
 PicStashly.Data.Sqlite/  SQLite DbContext, factory + migrations

@@ -1,4 +1,5 @@
 global using Extenso.Data.Entity;
+global using Microsoft.AspNetCore.Authorization;
 global using Microsoft.AspNetCore.Mvc;
 global using Microsoft.EntityFrameworkCore;
 global using PicStashly.Data.Entities;
