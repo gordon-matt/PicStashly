@@ -1,0 +1,99 @@
+@{
+    ViewData["Title"] = "Upload";
+}
+
+<div class="container">
+    <div class="row mb-3 align-items-center">
+        <div class="col">
+            <h2>Upload</h2>
+            <p class="text-muted mb-0">Drop files anywhere, paste from clipboard, or click to browse</p>
+        </div>
+    </div>
+
+    <div id="dropZone" class="drop-zone mb-3">
+        <i class="bi bi-cloud-arrow-up display-4 d-block mb-2"></i>
+        <p class="mb-1">Drag &amp; drop images here, or click to browse</p>
+        <p class="text-muted small mb-0">You can also paste an image anywhere on this page (Ctrl+V)</p>
+        <input type="file" id="fileInput" multiple accept="image/*" class="d-none" />
+    </div>
+
+    <!-- Batch tags -->
+    <div class="row g-2 mb-4 align-items-center">
+        <div class="col-auto">
+            <label for="batchTagsInput" class="col-form-label">Batch tags:</label>
+        </div>
+        <div class="col">
+            <input id="batchTagsInput" class="form-control" placeholder="Tags applied to every image in this batch..." />
+        </div>
+    </div>
+
+    <!-- Upload queue -->
+    <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-3" data-bind="foreach: queue">
+        <div class="col">
+            <div class="card h-100">
+                <img class="upload-card-thumb card-img-top" data-bind="attr: { src: previewUrl }" />
+                <div class="card-body p-2">
+                    <p class="card-text small fw-semibold text-truncate mb-1" data-bind="text: fileName"></p>
+
+                    <!-- Status -->
+                    <div data-bind="visible: status() === 'pending'" class="text-muted small">
+                        <i class="bi bi-hourglass"></i> Waiting...
+                    </div>
+                    <div data-bind="visible: status() === 'uploading'" class="text-muted small">
+                        <span class="spinner-border spinner-border-sm"></span> Uploading...
+                    </div>
+                    <div data-bind="visible: status() === 'saved'" class="text-success small">
+                        <i class="bi bi-check-circle"></i> Saved
+                    </div>
+                    <div data-bind="visible: status() === 'error'" class="text-danger small">
+                        <i class="bi bi-exclamation-triangle"></i> <span data-bind="text: errorMessage"></span>
+                    </div>
+
+                    <!-- Dedup prompt -->
+                    <div data-bind="visible: status() === 'duplicate'" class="mt-1">
+                        <div class="alert alert-warning py-2 px-2 small mb-2">
+                            <i class="bi bi-exclamation-triangle me-1"></i>
+                            You already have something similar:
+                        </div>
+                        <div class="d-flex flex-wrap gap-2 mb-2" data-bind="foreach: duplicates">
+                            <a data-bind="attr: { href: '/image/' + id, title: fileName + ' (distance ' + distance + ')' }" target="_blank">
+                                <img class="dedup-thumb" data-bind="attr: { src: thumbnailUrl }" />
+                            </a>
+                        </div>
+                        <div class="d-flex gap-2">
+                            <button class="btn btn-sm btn-primary" data-bind="click: $parent.saveAnyway">
+                                Save anyway
+                            </button>
+                            <button class="btn btn-sm btn-outline-secondary" data-bind="click: $parent.mergeTags">
+                                Merge tags into existing
+                            </button>
+                            <button class="btn btn-sm btn-outline-danger" data-bind="click: $parent.discard">
+                                Discard
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Per-image tags (after save) -->
+                    <div data-bind="visible: status() === 'saved'" class="mt-2">
+                        <input class="form-control form-control-sm per-image-tags"
+                               data-bind="attr: { 'data-queue-id': queueId }"
+                               placeholder="Tags for this image..." />
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div data-bind="visible: queue().length > 0" class="mt-4 d-flex gap-2" style="display: none;">
+        <a href="/" class="btn btn-outline-primary">
+            <i class="bi bi-grid-3x3-gap"></i> Go to Library
+        </a>
+        <button class="btn btn-outline-secondary" data-bind="click: clearFinished">
+            Clear finished
+        </button>
+    </div>
+</div>
+
+@section Scripts {
+    <script type="module" src="~/js/upload.js" asp-append-version="true"></script>
+}

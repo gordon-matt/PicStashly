@@ -1,0 +1,101 @@
+@{
+    ViewData["Title"] = "Admin";
+}
+
+<div class="container">
+    <h2 class="mb-4">Admin</h2>
+
+    <!-- Storage stats -->
+    <div class="row g-3 mb-4">
+        <div class="col-6 col-md-3">
+            <div class="card text-center h-100">
+                <div class="card-body">
+                    <h3 data-bind="text: formatNumber(stats()?.imageCount)"></h3>
+                    <span class="text-muted">Images</span>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="card text-center h-100">
+                <div class="card-body">
+                    <h3 data-bind="text: formatFileSize(stats()?.totalSizeBytes)"></h3>
+                    <span class="text-muted">Total size</span>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="card text-center h-100">
+                <div class="card-body">
+                    <h3 data-bind="text: formatNumber(stats()?.tagCount)"></h3>
+                    <span class="text-muted">Tags</span>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="card text-center h-100">
+                <div class="card-body">
+                    <h3 data-bind="text: formatNumber(stats()?.untaggedImageCount)"></h3>
+                    <span class="text-muted">Untagged</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Maintenance -->
+    <div class="card mb-4">
+        <div class="card-header"><i class="bi bi-tools me-1"></i> Maintenance</div>
+        <div class="card-body">
+            <div class="d-flex flex-wrap gap-2 mb-3">
+                <button class="btn btn-outline-primary" data-bind="click: runOrphanCheck, disable: busy">
+                    <i class="bi bi-search"></i> Check for orphans / broken files
+                </button>
+                <button class="btn btn-outline-primary" data-bind="click: runRehash, disable: busy">
+                    <i class="bi bi-fingerprint"></i> Re-compute all hashes
+                </button>
+                <button class="btn btn-outline-primary" data-bind="click: runReOcr, disable: busy">
+                    <i class="bi bi-body-text"></i> Re-run OCR on all images
+                </button>
+                <span data-bind="visible: busy" class="align-self-center text-muted">
+                    <span class="spinner-border spinner-border-sm"></span> Working — this can take a while...
+                </span>
+            </div>
+
+            <div data-bind="visible: maintenanceMessage" class="alert alert-info py-2" style="display: none;">
+                <span data-bind="text: maintenanceMessage"></span>
+            </div>
+
+            <!-- Orphan check results -->
+            <div data-bind="visible: orphanResult() !== null" style="display: none;">
+                <!-- ko with: orphanResult -->
+                <h6 class="mt-3">Orphaned files (on disk, not in database): <span data-bind="text: orphanedFiles.length"></span></h6>
+                <ul class="small" data-bind="foreach: orphanedFiles">
+                    <li><code data-bind="text: $data"></code></li>
+                </ul>
+                <h6>Broken images (in database, file missing): <span data-bind="text: brokenImages.length"></span></h6>
+                <ul class="small" data-bind="foreach: brokenImages">
+                    <li><a data-bind="attr: { href: '/image/' + id }, text: fileName"></a></li>
+                </ul>
+                <!-- /ko -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Bookmarklet -->
+    <div class="card mb-4">
+        <div class="card-header"><i class="bi bi-bookmark-plus me-1"></i> Bookmarklet</div>
+        <div class="card-body">
+            <p class="text-muted small">
+                Drag this link to your bookmarks bar. Clicking it on any webpage lets you pick an
+                image on the page and save it straight into PicStashly (with the page URL recorded
+                as the source).
+            </p>
+            <a id="bookmarkletLink" class="btn btn-outline-primary" href="#">
+                <i class="bi bi-images"></i> Stash it!
+            </a>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script type="module" src="~/js/admin.js" asp-append-version="true"></script>
+}

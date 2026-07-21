@@ -1,0 +1,37 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: PicStashly/Dockerfile
+    container_name: picstashly
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Production
+      - ASPNETCORE_URLS=http://+:8080
+      # Default: SQLite stored in the mounted data folder — zero configuration.
+      - Database__Provider=Sqlite
+      - ConnectionStrings__DefaultConnection=Data Source=/app/data/picstashly.db
+      - FileStorage__BasePath=/app/data/media
+      # To use PostgreSQL instead, comment the two lines above and uncomment:
+      # - Database__Provider=Npgsql
+      # - ConnectionStrings__DefaultConnection=Host=postgres;Database=picstashly;Username=picstashly;Password=change-me
+    volumes:
+      - picstashly-data:/app/data
+
+  # Optional PostgreSQL backend — uncomment together with the Npgsql settings above.
+  # postgres:
+  #   image: postgres:18-alpine
+  #   container_name: picstashly-postgres
+  #   restart: unless-stopped
+  #   environment:
+  #     - POSTGRES_DB=picstashly
+  #     - POSTGRES_USER=picstashly
+  #     - POSTGRES_PASSWORD=change-me
+  #   volumes:
+  #     - picstashly-pgdata:/var/lib/postgresql/data
+
+volumes:
+  picstashly-data:
+  # picstashly-pgdata:

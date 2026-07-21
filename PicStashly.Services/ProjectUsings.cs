@@ -1,0 +1,10 @@
+global using Ardalis.Result;
+global using Extenso.Data.Entity;
+global using LinqKit;
+global using Microsoft.EntityFrameworkCore;
+global using Microsoft.Extensions.Configuration;
+global using Microsoft.Extensions.Logging;
+global using PicStashly.Data.Entities;
+global using PicStashly.Models.Requests;
+global using PicStashly.Models.Responses;
+global using PicStashly.Services.Abstractions;

@@ -1,0 +1,89 @@
+@{
+    ViewData["Title"] = "Image Details";
+}
+
+<div class="container-fluid">
+    <div data-bind="visible: loading" class="text-center py-5">
+        <div class="spinner-border" role="status">
+            <span class="visually-hidden">Loading...</span>
+        </div>
+    </div>
+
+    <!-- ko with: image -->
+    <div class="row g-4">
+        <div class="col-12 col-lg-8 text-center">
+            <img class="detail-image" data-bind="attr: { src: url, alt: fileName }" />
+        </div>
+        <div class="col-12 col-lg-4">
+            <h4 class="text-break" data-bind="text: fileName"></h4>
+
+            <div class="mb-3">
+                <label class="form-label fw-semibold">Tags</label>
+                <input id="detailTagsInput" class="form-control" placeholder="Add tags..." />
+            </div>
+
+            <div class="mb-3">
+                <label class="form-label fw-semibold d-flex justify-content-between align-items-center">
+                    Extracted text (OCR)
+                    <button class="btn btn-sm btn-outline-primary" data-bind="click: $parent.saveOcrText, enable: $parent.ocrTextDirty">
+                        <i class="bi bi-save"></i> Save
+                    </button>
+                </label>
+                <textarea class="form-control" rows="5"
+                          placeholder="No text extracted — you can add/correct it here to make the image searchable"
+                          data-bind="value: $parent.ocrText, valueUpdate: 'afterkeydown'"></textarea>
+            </div>
+
+            <table class="table table-sm">
+                <tbody>
+                    <tr>
+                        <th scope="row">Dimensions</th>
+                        <td><span data-bind="text: width"></span> × <span data-bind="text: height"></span></td>
+                    </tr>
+                    <tr>
+                        <th scope="row">File size</th>
+                        <td data-bind="text: $parent.formatFileSize(fileSizeBytes)"></td>
+                    </tr>
+                    <tr>
+                        <th scope="row">Type</th>
+                        <td data-bind="text: contentType"></td>
+                    </tr>
+                    <tr>
+                        <th scope="row">Added</th>
+                        <td data-bind="text: $parent.formatDateTime(dateAdded)"></td>
+                    </tr>
+                    <tr>
+                        <th scope="row">pHash</th>
+                        <td><code data-bind="text: perceptualHash"></code></td>
+                    </tr>
+                    <tr data-bind="visible: sourceUrl">
+                        <th scope="row">Source</th>
+                        <td class="text-break">
+                            <a data-bind="attr: { href: sourceUrl }, text: sourceUrl" target="_blank" rel="noopener"></a>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <div class="d-flex gap-2">
+                <a class="btn btn-outline-primary" data-bind="attr: { href: url, download: fileName }">
+                    <i class="bi bi-download"></i> Download
+                </a>
+                <button class="btn btn-outline-danger" data-bind="click: $parent.deleteImage">
+                    <i class="bi bi-trash"></i> Delete
+                </button>
+                <a href="/" class="btn btn-outline-secondary ms-auto">
+                    <i class="bi bi-grid-3x3-gap"></i> Library
+                </a>
+            </div>
+        </div>
+    </div>
+    <!-- /ko -->
+</div>
+
+@section Scripts {
+    <script>
+        const imageId = @ViewBag.ImageId;
+    </script>
+    <script type="module" src="~/js/image-details.js" asp-append-version="true"></script>
+}
