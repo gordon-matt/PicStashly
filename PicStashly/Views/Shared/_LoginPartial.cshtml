@@ -2,7 +2,13 @@
 @using PicStashly.Infrastructure
 @inject IAuthProviderService AuthProvider
 
-<ul class="navbar-nav">
+<ul class="navbar-nav align-items-sm-center">
+    <li class="nav-item">
+        <button type="button" class="btn btn-sm btn-outline-secondary border-0" title="Theme"
+                data-bs-toggle="modal" data-bs-target="#themePickerModal">
+            <i class="bi bi-palette"></i>
+        </button>
+    </li>
 @if (User.Identity?.IsAuthenticated == true)
 {
     <li class="nav-item">

@@ -1,0 +1,72 @@
+@{
+    string TitleCase(string s) =>
+        string.IsNullOrEmpty(s) ? s : char.ToUpperInvariant(s[0]) + s[1..];
+}
+
+<div class="modal fade" id="themePickerModal" tabindex="-1" aria-labelledby="themePickerModalLabel"
+     aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 class="modal-title fs-5" id="themePickerModalLabel">Bootswatch theme</h2>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body">
+                <p class="small text-body-secondary mb-3">
+                    Your choice is saved in this browser only. Preview with a click; save with
+                    <strong>OK</strong>, or <strong>Cancel</strong> / close to restore the previous theme.
+                </p>
+
+                <ul class="nav nav-tabs" role="tablist">
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link active" id="theme-tab-dark" data-bs-toggle="tab"
+                                data-bs-target="#theme-pane-dark" type="button" role="tab"
+                                aria-controls="theme-pane-dark" aria-selected="true">
+                            Dark
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link" id="theme-tab-light" data-bs-toggle="tab"
+                                data-bs-target="#theme-pane-light" type="button" role="tab"
+                                aria-controls="theme-pane-light" aria-selected="false">
+                            Light
+                        </button>
+                    </li>
+                </ul>
+
+                <div class="tab-content pt-3">
+                    <div class="tab-pane fade show active" id="theme-pane-dark" role="tabpanel"
+                         aria-labelledby="theme-tab-dark" tabindex="0">
+                        <div class="list-group theme-picker-theme-list">
+                            @foreach (var t in Constants.BootswatchThemes.DarkThemes)
+                            {
+                                <button type="button"
+                                        class="list-group-item list-group-item-action d-flex align-items-center justify-content-between gap-2"
+                                        data-theme-name="@t">
+                                    <span>@TitleCase(t)</span>
+                                </button>
+                            }
+                        </div>
+                    </div>
+                    <div class="tab-pane fade" id="theme-pane-light" role="tabpanel"
+                         aria-labelledby="theme-tab-light" tabindex="0">
+                        <div class="list-group theme-picker-theme-list">
+                            @foreach (var t in Constants.BootswatchThemes.LightThemes)
+                            {
+                                <button type="button"
+                                        class="list-group-item list-group-item-action d-flex align-items-center justify-content-between gap-2"
+                                        data-theme-name="@t">
+                                    <span>@TitleCase(t)</span>
+                                </button>
+                            }
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-outline-secondary" id="themePickerCancel">Cancel</button>
+                <button type="button" class="btn btn-primary" id="themePickerOk">OK</button>
+            </div>
+        </div>
+    </div>
+</div>

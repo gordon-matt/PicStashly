@@ -10,14 +10,16 @@
     <link rel="manifest" href="~/manifest.webmanifest" />
     <link rel="icon" href="~/favicon.ico" />
 
+    @* Default stylesheet; theme-init.js swaps href from localStorage before first paint. *@
+    <link id="theme-stylesheet" rel="stylesheet" href="~/lib/bootswatch/dist/darkly/bootstrap.min.css" />
+    <script src="~/js/theme-init.js" asp-append-version="true"></script>
+
     <environment include="Development">
-        <link rel="stylesheet" href="~/lib/bootswatch/dist/darkly/bootstrap.css" />
         <link rel="stylesheet" href="~/lib/bootstrap-icons/font/bootstrap-icons.css">
         <link rel="stylesheet" href="~/lib/egalink-toasty.js/dist/toasty.css" />
         <link rel="stylesheet" href="~/lib/yaireo/tagify/dist/tagify.css" />
     </environment>
     <environment exclude="Development">
-        <link rel="stylesheet" href="~/lib/bootswatch/dist/darkly/bootstrap.min.css" />
         <link rel="stylesheet" href="~/lib/bootstrap-icons/font/bootstrap-icons.min.css">
         <link rel="stylesheet" href="~/lib/egalink-toasty.js/dist/toasty.min.css" />
         <link rel="stylesheet" href="~/lib/yaireo/tagify/dist/tagify.min.css" />
@@ -30,14 +32,11 @@
 </head>
 <body>
     <header>
-        <nav class="navbar navbar-expand-sm navbar-dark bg-dark border-bottom box-shadow mb-3">
+        <nav class="navbar navbar-expand-sm bg-body-tertiary border-bottom box-shadow mb-3" data-bs-theme="dark">
             <div class="container-fluid">
-                @* <a class="navbar-brand" asp-area="" asp-controller="Home" asp-action="Index">
-                    <i class="bi bi-images me-1"></i> PicStashly
-                </a> *@
-
                 <a class="navbar-brand" asp-area="" asp-controller="Home" asp-action="Index">
-                    <img src="/img/Logo-Light.png" alt="PicStashly" height="50" />
+                    <img class="navbar-brand-logo navbar-brand-logo-light" src="~/img/Logo.png" alt="PicStashly" height="50" />
+                    <img class="navbar-brand-logo navbar-brand-logo-dark" src="~/img/Logo-Light.png" alt="PicStashly" height="50" />
                 </a>
 
                 <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target=".navbar-collapse" aria-controls="navbarSupportedContent"
@@ -93,6 +92,8 @@
         </div>
     </footer>
 
+    <partial name="_ThemePicker" />
+
     <environment include="Development">
         <script src="~/lib/jquery/dist/jquery.js"></script>
         <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.js"></script>
@@ -107,6 +108,8 @@
         <script src="~/lib/yaireo/tagify/dist/tagify.min.js"></script>
         <script src="~/lib/egalink-toasty.js/dist/toasty.min.js"></script>
     </environment>
+
+    <script src="~/js/theme-picker.js" asp-append-version="true"></script>
 
     <script type="text/javascript">
         const toast = new Toasty({
