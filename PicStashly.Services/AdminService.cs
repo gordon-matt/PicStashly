@@ -18,6 +18,7 @@ public class AdminService(
                 i => new { i.FileSizeBytes, i.DateAdded, IsUntagged = !i.ImageTags.Any() })).ToList();
 
             int tagCount = await tagRepository.CountAsync();
+            bool ocrAvailable = await ocr.IsAvailableAsync();
 
             return Result.Success(new StorageStats(
                 summaries.Count,
@@ -25,7 +26,8 @@ public class AdminService(
                 tagCount,
                 summaries.Count(s => s.IsUntagged),
                 summaries.Count > 0 ? summaries.Min(s => s.DateAdded) : null,
-                summaries.Count > 0 ? summaries.Max(s => s.DateAdded) : null));
+                summaries.Count > 0 ? summaries.Max(s => s.DateAdded) : null,
+                ocrAvailable));
         }
         catch (Exception ex)
         {

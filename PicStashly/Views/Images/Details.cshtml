@@ -74,6 +74,9 @@
             </table>
 
             <div class="d-flex gap-2">
+                <button class="btn btn-outline-primary" data-bind="click: $parent.copyImage">
+                    <i class="bi bi-clipboard"></i> Copy
+                </button>
                 <a class="btn btn-outline-primary" data-bind="attr: { href: url, download: fileName }">
                     <i class="bi bi-download"></i> Download
                 </a>

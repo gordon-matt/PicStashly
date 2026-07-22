@@ -6,4 +6,5 @@ public record StorageStats(
     int TagCount,
     int UntaggedImageCount,
     DateTime? OldestImage,
-    DateTime? NewestImage);
+    DateTime? NewestImage,
+    bool OcrAvailable);

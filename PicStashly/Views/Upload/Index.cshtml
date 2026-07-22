@@ -72,8 +72,9 @@
                             <button class="btn btn-sm btn-primary" data-bind="click: $parent.saveAnyway">
                                 Save anyway
                             </button>
-                            <button class="btn btn-sm btn-outline-secondary" data-bind="click: $parent.mergeTags">
-                                Merge tags into existing
+                            <button class="btn btn-sm btn-outline-secondary" data-bind="click: $parent.mergeTags, enable: $parent.hasBatchTags"
+                                    title="A new upload has no tags of its own yet — this applies the batch tags typed above onto the existing image instead">
+                                Add batch tags to existing
                             </button>
                             <button class="btn btn-sm btn-outline-danger" data-bind="click: $parent.discard">
                                 Discard

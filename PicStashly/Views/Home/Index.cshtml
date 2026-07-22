@@ -87,6 +87,11 @@
             <input type="checkbox" class="form-check-input select-check"
                    data-bind="visible: $parent.selectionMode, checked: $parent.isSelected($data),
                               event: { click: function (d, e) { e.stopPropagation(); $parent.toggleSelected($data); return true; } }" />
+            <button type="button" class="btn btn-sm btn-secondary item-copy" title="Copy image"
+                    data-bind="visible: !$parent.selectionMode(),
+                               event: { click: function (d, e) { e.stopPropagation(); $parent.copyItemImage($data); return true; } }">
+                <i class="bi bi-clipboard"></i>
+            </button>
             <button type="button" class="btn btn-sm btn-secondary item-edit-tags" title="Edit tags"
                     data-bind="visible: !$parent.selectionMode(),
                                event: { click: function (d, e) { e.stopPropagation(); $parent.editItemTags($data); return true; } }">
@@ -138,6 +143,9 @@
         <a class="btn btn-sm btn-outline-light" data-bind="attr: { href: '/image/' + id }" title="Details">
             <i class="bi bi-info-circle"></i>
         </a>
+        <button class="btn btn-sm btn-outline-light" data-bind="click: $parent.copyLightboxImage" title="Copy image to clipboard">
+            <i class="bi bi-clipboard"></i>
+        </button>
         <a class="btn btn-sm btn-outline-light" data-bind="attr: { href: url, download: fileName }" title="Download">
             <i class="bi bi-download"></i>
         </a>

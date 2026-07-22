@@ -41,6 +41,23 @@
         </div>
     </div>
 
+    <!-- OCR availability -->
+    <div data-bind="visible: stats() && !stats().ocrAvailable" class="alert alert-warning" style="display: none;">
+        <i class="bi bi-exclamation-triangle me-1"></i>
+        <strong>OCR is unavailable</strong> — the <code>tesseract</code> CLI wasn't found, so text
+        extraction is being skipped for every upload. If you just installed it:
+        <ul class="mb-2">
+            <li>Restart the app — a process already running keeps the PATH it started with, so
+                adding tesseract to PATH afterwards has no effect until it's restarted.</li>
+            <li>If <code>Ocr:TesseractPath</code> is set in <code>appsettings.json</code>, it must
+                point at the executable (or its folder) — e.g.
+                <code>C:\Program Files\Tesseract-OCR\tesseract.exe</code> — not some other path.</li>
+        </ul>
+        Otherwise, install it: <code>winget install tesseract-ocr.tesseract</code> (Windows) or
+        <code>apt install tesseract-ocr</code> (Linux/Docker — already bundled in this app's Docker image).
+        Once it's working, use <strong>Re-run OCR on all images</strong> below to backfill existing uploads.
+    </div>
+
     <!-- Maintenance -->
     <div class="card mb-4">
         <div class="card-header"><i class="bi bi-tools me-1"></i> Maintenance</div>

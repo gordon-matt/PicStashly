@@ -4,11 +4,14 @@
 # Base stage: used directly by Visual Studio (F5 / fast mode debug).
 # tesseract-ocr is installed here so image text extraction works out of the box.
 FROM mcr.microsoft.com/dotnet/aspnet:10.0-noble AS base
+# tesseract-ocr-eng is listed explicitly (not just pulled in as a recommends) so English OCR
+# works even on minimal base images where --no-install-recommends would otherwise drop it.
 RUN apt-get update \
-  && apt-get install -y --no-install-recommends tesseract-ocr \
+  && apt-get install -y --no-install-recommends tesseract-ocr tesseract-ocr-eng \
   && rm -rf /var/lib/apt/lists/*
-# Verify tesseract is present and runnable — build fails here if something went wrong.
-RUN tesseract --version | head -n1
+# Verify tesseract is present, runnable, and can actually find the eng language data —
+# build fails here if something went wrong, instead of silently shipping a broken OCR setup.
+RUN tesseract --version | head -n1 && tesseract --list-langs | grep -qx eng
 WORKDIR /app
 EXPOSE 8080
 EXPOSE 8081

@@ -22,6 +22,9 @@ class UploadViewModel {
         this.queue = ko.observableArray([]);
         this.categories = ko.observableArray([]);
         this.selectedCategoryId = ko.observable('');
+        // Freshly-uploaded images never have tags yet, so "merge" only ever means: apply the
+        // batch tags typed above onto the existing (duplicate) image instead of this new one.
+        this.hasBatchTags = ko.observable(false);
         this._batchTagify = null;
         this._tagWhitelist = [];
         this._processing = false;
@@ -37,6 +40,7 @@ class UploadViewModel {
         this._batchTagify = new Tagify(
             document.getElementById('batchTagsInput'),
             getTagifyOptions(this._tagWhitelist));
+        this._batchTagify.on('change', () => this.hasBatchTags(this._batchTagify.value.length > 0));
 
         const dropZone = document.getElementById('dropZone');
         const fileInput = document.getElementById('fileInput');
@@ -173,38 +177,39 @@ class UploadViewModel {
 
     saveAnyway = (item) => this._uploadItem(item, true);
 
+    // New uploads never have tags yet — this applies the batch tags typed above onto the
+    // existing (duplicate) image instead, then discards this upload. Disabled when the
+    // batch tags box is empty, since there'd be nothing to merge.
     mergeTags = async (item) => {
         const batchTags = this._batchTagify.value.map(t => t.value);
         const target = item.duplicates()[0];
 
-        if (!target) {
+        if (!target || batchTags.length === 0) {
             this.discard(item);
             return;
         }
 
-        if (batchTags.length > 0) {
-            try {
-                const response = await fetch('/api/images/bulk-tags', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        imageIds: [target.id],
-                        tagNames: batchTags,
-                        remove: false
-                    })
-                });
+        try {
+            const response = await fetch('/api/images/bulk-tags', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    imageIds: [target.id],
+                    tagNames: batchTags,
+                    remove: false
+                })
+            });
 
-                if (response.ok) {
-                    toast.success(`Tags merged into "${target.fileName}".`);
-                } else {
-                    toast.error('Failed to merge tags.');
-                    return;
-                }
-            } catch (error) {
-                console.error('Error merging tags:', error);
+            if (!response.ok) {
                 toast.error('Failed to merge tags.');
                 return;
             }
+
+            toast.success(`Tags merged into "${target.fileName}".`);
+        } catch (error) {
+            console.error('Error merging tags:', error);
+            toast.error('Failed to merge tags.');
+            return;
         }
 
         this.discard(item);

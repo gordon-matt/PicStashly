@@ -1,5 +1,6 @@
 import { getTagifyOptions, loadTagWhitelist } from './tagify-options.js';
 import { loadCategories } from './categories-shared.js';
+import { copyImageToClipboard } from './utils.js';
 
 const PAGE_SIZE = 60;
 
@@ -237,6 +238,23 @@ class LibraryViewModel {
         // Knockout's `with` binding creates the toolbar DOM synchronously on the
         // assignment above, but defer one tick so layout has settled.
         setTimeout(() => this._initLightboxTags(image), 0);
+    };
+
+    copyItemImage = (image) => this._copyImage(image.url);
+
+    copyLightboxImage = () => {
+        const image = this.lightboxImage();
+        if (image) this._copyImage(image.url);
+    };
+
+    _copyImage = async (url) => {
+        try {
+            await copyImageToClipboard(url);
+            toast.success('Image copied to clipboard.');
+        } catch (error) {
+            console.error('Error copying image:', error);
+            toast.error(error.message || 'Failed to copy image.');
+        }
     };
 
     // Quick access straight from the grid tile: open the lightbox with focus already in the tags input.

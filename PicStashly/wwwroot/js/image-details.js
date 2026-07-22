@@ -1,4 +1,4 @@
-import { formatDateTime, formatFileSize } from './utils.js';
+import { formatDateTime, formatFileSize, copyImageToClipboard } from './utils.js';
 import { getTagifyOptions, loadTagWhitelist } from './tagify-options.js';
 import { loadCategories } from './categories-shared.js';
 
@@ -94,6 +94,19 @@ class ImageDetailsViewModel {
         } catch (error) {
             console.error('Error updating category:', error);
             toast.error('Failed to update category.');
+        }
+    };
+
+    copyImage = async () => {
+        const image = this.image();
+        if (!image) return;
+
+        try {
+            await copyImageToClipboard(image.url);
+            toast.success('Image copied to clipboard.');
+        } catch (error) {
+            console.error('Error copying image:', error);
+            toast.error(error.message || 'Failed to copy image.');
         }
     };
 

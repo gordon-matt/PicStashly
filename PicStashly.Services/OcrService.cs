@@ -11,6 +11,7 @@ namespace PicStashly.Services;
 public class OcrService(IOptions<OcrOptions> ocrOptions, ILogger<OcrService> logger) : IOcrService
 {
     private bool? isTesseractAvailable;
+    private string? resolvedExecutablePath;
 
     public async Task<string?> ExtractTextAsync(string fullPath, CancellationToken cancellationToken = default)
     {
@@ -27,7 +28,7 @@ public class OcrService(IOptions<OcrOptions> ocrOptions, ILogger<OcrService> log
             {
                 StartInfo = new ProcessStartInfo
                 {
-                    FileName = opts.TesseractPath,
+                    FileName = resolvedExecutablePath,
                     ArgumentList = { fullPath, "stdout", "-l", opts.Languages },
                     RedirectStandardOutput = true,
                     RedirectStandardError = true,
@@ -63,12 +64,14 @@ public class OcrService(IOptions<OcrOptions> ocrOptions, ILogger<OcrService> log
         }
     }
 
-    private async Task<bool> IsAvailableAsync(CancellationToken cancellationToken)
+    public async Task<bool> IsAvailableAsync(CancellationToken cancellationToken = default)
     {
         if (isTesseractAvailable.HasValue)
         {
             return isTesseractAvailable.Value;
         }
+
+        resolvedExecutablePath = ResolveExecutablePath(ocrOptions.Value.TesseractPath);
 
         try
         {
@@ -76,7 +79,7 @@ public class OcrService(IOptions<OcrOptions> ocrOptions, ILogger<OcrService> log
             {
                 StartInfo = new ProcessStartInfo
                 {
-                    FileName = ocrOptions.Value.TesseractPath,
+                    FileName = resolvedExecutablePath,
                     ArgumentList = { "--version" },
                     RedirectStandardOutput = true,
                     RedirectStandardError = true,
@@ -89,18 +92,54 @@ public class OcrService(IOptions<OcrOptions> ocrOptions, ILogger<OcrService> log
             await process.WaitForExitAsync(cancellationToken);
             isTesseractAvailable = process.ExitCode == 0;
         }
-        catch
+        catch (Exception ex)
         {
             isTesseractAvailable = false;
+
+            if (logger.IsEnabled(LogLevel.Warning))
+            {
+                logger.LogWarning(
+                    ex,
+                    "Tesseract not found at '{Path}' (resolved to '{ResolvedPath}'). OCR is skipped — " +
+                    "install tesseract, or set Ocr:TesseractPath to the tesseract executable itself " +
+                    "(not just its folder). Restart the app after changing PATH — running processes " +
+                    "don't pick up PATH changes made after they started.",
+                    ocrOptions.Value.TesseractPath,
+                    resolvedExecutablePath);
+            }
+
+            return false;
         }
 
         if (isTesseractAvailable == false && logger.IsEnabled(LogLevel.Warning))
         {
             logger.LogWarning(
-                "Tesseract not found at '{Path}'. OCR is skipped — install tesseract or set Ocr:TesseractPath.",
-                ocrOptions.Value.TesseractPath);
+                "Tesseract at '{ResolvedPath}' exited with a non-zero code on --version. OCR is skipped.",
+                resolvedExecutablePath);
         }
 
         return isTesseractAvailable.Value;
+    }
+
+    /// <summary>
+    /// Accepts either a bare command ("tesseract", resolved via PATH), a full path to the
+    /// executable, or — the easy mistake — the install *folder* (e.g. what you'd copy from
+    /// "where tesseract" minus the filename, or the default Windows install directory). In the
+    /// last case, appends the platform-appropriate executable name so it still works.
+    /// </summary>
+    private static string ResolveExecutablePath(string configuredPath)
+    {
+        if (string.IsNullOrWhiteSpace(configuredPath))
+        {
+            return "tesseract";
+        }
+
+        if (!Directory.Exists(configuredPath))
+        {
+            return configuredPath;
+        }
+
+        string exeName = OperatingSystem.IsWindows() ? "tesseract.exe" : "tesseract";
+        return Path.Combine(configuredPath, exeName);
     }
 }
