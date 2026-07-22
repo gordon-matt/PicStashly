@@ -1,8 +1,10 @@
+using Microsoft.Extensions.Options;
+
 namespace PicStashly.Services;
 
 public class ImageService(
     ILogger<ImageService> logger,
-    Microsoft.Extensions.Options.IOptions<UploadOptions> uploadOptions,
+    IOptions<UploadOptions> uploadOptions,
     IHttpClientFactory httpClientFactory,
     IFileStorageService fileStorage,
     IPerceptualHashService perceptualHash,
@@ -29,10 +31,16 @@ public class ImageService(
             var options = new SearchOptions<Image>
             {
                 Query = predicate,
-                Include = query => query.Include(i => i.ImageTags).ThenInclude(it => it.Tag).Include(i => i.Category),
+
+                Include = query => query
+                    .Include(i => i.Category)
+                    .Include(i => i.ImageTags)
+                        .ThenInclude(it => it.Tag),
+
                 OrderBy = request.Sort.Equals("oldest", StringComparison.OrdinalIgnoreCase)
                     ? query => query.OrderBy(i => i.DateAdded).ThenBy(i => i.Id)
                     : query => query.OrderByDescending(i => i.DateAdded).ThenByDescending(i => i.Id),
+
                 PageNumber = page,
                 PageSize = pageSize,
                 SplitQuery = true
@@ -516,7 +524,12 @@ public class ImageService(
         var images = await imageRepository.FindAsync(new SearchOptions<Image>
         {
             Query = i => pageIds.Contains(i.Id),
-            Include = query => query.Include(i => i.ImageTags).ThenInclude(it => it.Tag).Include(i => i.Category),
+
+            Include = query => query
+                .Include(i => i.Category)
+                .Include(i => i.ImageTags)
+                    .ThenInclude(it => it.Tag),
+
             SplitQuery = true
         });
 
@@ -556,7 +569,10 @@ public class ImageService(
         var matches = await imageRepository.FindAsync(new SearchOptions<Image>
         {
             Query = i => matchIds.Contains(i.Id),
-            Include = query => query.Include(i => i.ImageTags).ThenInclude(it => it.Tag)
+
+            Include = query => query
+                .Include(i => i.ImageTags)
+                    .ThenInclude(it => it.Tag)
         });
 
         return matches
@@ -628,15 +644,17 @@ public class ImageService(
         }
     }
 
-    private async Task<Image?> FindWithTagsAsync(int id) =>
-        await imageRepository.FindOneAsync(new SearchOptions<Image>
-        {
-            Query = x => x.Id == id,
-            Include = query => query.Include(i => i.ImageTags).ThenInclude(it => it.Tag).Include(i => i.Category)
-        });
+    private async Task<Image?> FindWithTagsAsync(int id) => await imageRepository.FindOneAsync(new SearchOptions<Image>
+    {
+        Query = x => x.Id == id,
 
-    internal static List<string> NormalizeTagNames(List<string>? tagNames) =>
-        tagNames
+        Include = query => query
+            .Include(i => i.Category)
+            .Include(i => i.ImageTags)
+                .ThenInclude(it => it.Tag)
+    });
+
+    internal static List<string> NormalizeTagNames(List<string>? tagNames) => tagNames
             ?.Where(t => !string.IsNullOrWhiteSpace(t))
             .Select(t => t.Trim().ToLowerInvariant())
             .Distinct(StringComparer.OrdinalIgnoreCase)
@@ -644,8 +662,7 @@ public class ImageService(
 
     internal static string GetMediaUrl(string relativePath) => $"{Constants.MediaRequestPath}/{relativePath}";
 
-    private static List<string> GetTagNames(Image image) =>
-        image.ImageTags.Select(it => it.Tag.Name).OrderBy(n => n).ToList();
+    private static List<string> GetTagNames(Image image) => image.ImageTags.Select(it => it.Tag.Name).OrderBy(n => n).ToList();
 
     internal static ImageListItem MapToListItem(Image image) => new(
         image.Id,

@@ -24,8 +24,7 @@ public class ImagesApiController : ControllerBase
         [FromQuery] DateTime? dateFrom = null,
         [FromQuery] DateTime? dateTo = null,
         [FromQuery] string sort = "newest",
-        [FromQuery] int shuffleSeed = 0) =>
-        imageService.SearchAsync(new ImageSearchRequest(
+        [FromQuery] int shuffleSeed = 0) => imageService.SearchAsync(new ImageSearchRequest(
             page, pageSize, search, tags, categoryId, untaggedOnly, dateFrom, dateTo, sort, shuffleSeed));
 
     [HttpGet("{id:int}")]
@@ -57,16 +56,13 @@ public class ImagesApiController : ControllerBase
     public Task<Result> Delete(int id) => imageService.DeleteAsync(id);
 
     [HttpPut("{id:int}/tags")]
-    public Task<Result<List<string>>> SetTags(int id, [FromBody] SetImageTagsRequest request) =>
-        imageService.SetTagsAsync(id, request);
+    public Task<Result<List<string>>> SetTags(int id, [FromBody] SetImageTagsRequest request) => imageService.SetTagsAsync(id, request);
 
     [HttpPut("{id:int}/category")]
-    public Task<Result<ImageDetail>> SetCategory(int id, [FromBody] SetImageCategoryRequest request) =>
-        imageService.SetCategoryAsync(id, request);
+    public Task<Result<ImageDetail>> SetCategory(int id, [FromBody] SetImageCategoryRequest request) => imageService.SetCategoryAsync(id, request);
 
     [HttpPut("{id:int}/ocr")]
-    public Task<Result> UpdateOcrText(int id, [FromBody] UpdateOcrTextRequest request) =>
-        imageService.UpdateOcrTextAsync(id, request);
+    public Task<Result> UpdateOcrText(int id, [FromBody] UpdateOcrTextRequest request) => imageService.UpdateOcrTextAsync(id, request);
 
     [HttpPost("bulk-tags")]
     public Task<Result> BulkTag([FromBody] BulkTagRequest request) => imageService.BulkTagAsync(request);

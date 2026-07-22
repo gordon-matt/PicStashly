@@ -1,9 +1,8 @@
-namespace PicStashly.Models
-{
-    public class ErrorViewModel
-    {
-        public string? RequestId { get; set; }
+namespace PicStashly.Models;
 
-        public bool ShowRequestId => !string.IsNullOrEmpty(RequestId);
-    }
+public class ErrorViewModel
+{
+    public string? RequestId { get; set; }
+
+    public bool ShowRequestId => !string.IsNullOrEmpty(RequestId);
 }

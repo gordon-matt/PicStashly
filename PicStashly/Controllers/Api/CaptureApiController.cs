@@ -18,6 +18,5 @@ public class CaptureApiController : ControllerBase
     public Task<Result<IngestResult>> Capture(
         [FromBody] CaptureRequest request,
         [FromQuery] bool force = false,
-        CancellationToken cancellationToken = default) =>
-        imageService.IngestFromUrlAsync(request, force, cancellationToken);
+        CancellationToken cancellationToken = default) => imageService.IngestFromUrlAsync(request, force, cancellationToken);
 }

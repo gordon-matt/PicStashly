@@ -17,8 +17,7 @@ public class TagsApiController : ControllerBase
     public Task<Result<List<TagItem>>> GetTags() => tagService.GetTagsAsync();
 
     [HttpPut("{id:int}")]
-    public Task<Result<TagItem>> Rename(int id, [FromBody] RenameTagRequest request) =>
-        tagService.RenameTagAsync(id, request);
+    public Task<Result<TagItem>> Rename(int id, [FromBody] RenameTagRequest request) => tagService.RenameTagAsync(id, request);
 
     [HttpPost("merge")]
     public Task<Result> Merge([FromBody] MergeTagsRequest request) => tagService.MergeTagsAsync(request);

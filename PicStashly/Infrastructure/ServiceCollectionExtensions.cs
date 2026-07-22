@@ -133,7 +133,9 @@ internal static class ServiceCollectionExtensions
                         options.Events.OnRedirectToIdentityProvider = context =>
                         {
                             if (!string.IsNullOrWhiteSpace(publicOrigin))
+                            {
                                 context.ProtocolMessage.RedirectUri = publicOrigin + "/signin-oidc";
+                            }
 
                             if (useBackchannel && !string.IsNullOrEmpty(keycloakAuthority))
                             {
@@ -141,7 +143,7 @@ internal static class ServiceCollectionExtensions
                                 // https://keycloak.example.com/... (no internal host/port).
                                 string fullUrl = context.ProtocolMessage.CreateAuthenticationRequestUrl();
                                 int queryIndex = fullUrl.IndexOf('?');
-                                string query = queryIndex >= 0 ? fullUrl.Substring(queryIndex) : string.Empty;
+                                string query = queryIndex >= 0 ? fullUrl[queryIndex..] : string.Empty;
                                 string authUrl = keycloakAuthority.TrimEnd('/') + "/protocol/openid-connect/auth" + query;
                                 context.Response.Redirect(authUrl);
                                 context.HandleResponse();

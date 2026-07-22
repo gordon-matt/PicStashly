@@ -9,8 +9,8 @@ public class UploadOptions
     /// <summary>Maximum pHash Hamming distance (0-64) for two images to be considered near-duplicates.</summary>
     public int DuplicateHammingThreshold { get; set; } = 5;
 
-    public HashSet<string> AllowedExtensionSet
-        => field ??= AllowedExtensions
+    public HashSet<string> AllowedExtensionSet =>
+        field ??= AllowedExtensions
             .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
 }

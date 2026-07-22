@@ -10,8 +10,7 @@ public class ApplicationDbContextFactory(IConfiguration configuration) : IDbCont
 
     public DbContext GetContext() => new ApplicationDbContext(Options);
 
-    public DbContext GetContext(string connectionString)
-        => new ApplicationDbContext(BuildOptions(connectionString));
+    public DbContext GetContext(string connectionString) => new ApplicationDbContext(BuildOptions(connectionString));
 
     private static DbContextOptions<ApplicationDbContext> BuildOptions(string? connectionString)
     {

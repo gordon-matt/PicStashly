@@ -44,7 +44,9 @@ public class AdminService(
         {
             var images = await imageRepository.FindAsync(new SearchOptions<Image>
             {
-                Include = query => query.Include(i => i.ImageTags).ThenInclude(it => it.Tag)
+                Include = query => query
+                    .Include(i => i.ImageTags)
+                        .ThenInclude(it => it.Tag)
             });
 
             var knownPaths = images.Select(i => i.StoragePath).ToHashSet(StringComparer.OrdinalIgnoreCase);

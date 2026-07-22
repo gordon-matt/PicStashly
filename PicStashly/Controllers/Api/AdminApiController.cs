@@ -20,10 +20,8 @@ public class AdminApiController : ControllerBase
     public Task<Result<OrphanCheckResult>> CheckOrphans() => adminService.CheckOrphansAsync();
 
     [HttpPost("rehash")]
-    public Task<Result<MaintenanceResult>> Rehash(CancellationToken cancellationToken) =>
-        adminService.RehashAllAsync(cancellationToken);
+    public Task<Result<MaintenanceResult>> Rehash(CancellationToken cancellationToken) => adminService.RehashAllAsync(cancellationToken);
 
     [HttpPost("reocr")]
-    public Task<Result<MaintenanceResult>> ReRunOcr(CancellationToken cancellationToken) =>
-        adminService.ReRunOcrAsync(cancellationToken);
+    public Task<Result<MaintenanceResult>> ReRunOcr(CancellationToken cancellationToken) => adminService.ReRunOcrAsync(cancellationToken);
 }

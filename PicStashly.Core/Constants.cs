@@ -58,11 +58,10 @@ public static class Constants
                 "cyborg", "darkly", "slate", "solar", "superhero", "vapor"
             };
 
-        public static bool IsDarkColorScheme(string? theme) =>
-            !string.IsNullOrEmpty(theme) && DarkColorScheme.Contains(theme);
+        public static bool IsDarkColorScheme(string? theme) => !string.IsNullOrEmpty(theme) && DarkColorScheme.Contains(theme);
 
         public static IEnumerable<string> DarkThemes =>
-            All.Where(t => DarkColorScheme.Contains(t));
+            All.Where(DarkColorScheme.Contains);
 
         public static IEnumerable<string> LightThemes =>
             All.Where(t => !DarkColorScheme.Contains(t));

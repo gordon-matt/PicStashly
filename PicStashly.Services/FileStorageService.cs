@@ -26,8 +26,7 @@ public class FileStorageService(IConfiguration configuration, IOptions<ImageProc
 
     public string GetBaseStoragePath() => BasePath;
 
-    public string GetFullPath(string relativePath)
-        => Path.Combine(BasePath, relativePath.Replace('/', Path.DirectorySeparatorChar));
+    public string GetFullPath(string relativePath) => Path.Combine(BasePath, relativePath.Replace('/', Path.DirectorySeparatorChar));
 
     public void DeleteFile(string relativePath)
     {

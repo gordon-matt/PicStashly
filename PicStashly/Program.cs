@@ -56,10 +56,7 @@ builder.Services.AddControllersWithViews(mvcOptions => mvcOptions
 builder.Services.AddRazorPages();
 
 // Allow large multi-file upload batches (per-file size is validated in the ingest pipeline).
-builder.Services.Configure<FormOptions>(options =>
-{
-    options.MultipartBodyLengthLimit = 524_288_000; // 500 MB
-});
+builder.Services.Configure<FormOptions>(options => options.MultipartBodyLengthLimit = 524_288_000);
 
 var app = builder.Build();
 

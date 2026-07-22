@@ -9,12 +9,15 @@ public class CategoryService(
     {
         try
         {
-            var categories = await categoryRepository.FindAsync(
-                new SearchOptions<Category> { OrderBy = query => query.OrderBy(c => c.Name) });
+            var categories = await categoryRepository.FindAsync(new SearchOptions<Category>
+            {
+                OrderBy = query => query.OrderBy(c => c.Name)
+            });
 
-            var imageCounts = await imageRepository.FindAsync(
-                new SearchOptions<Image> { Query = i => i.CategoryId != null },
-                i => i.CategoryId);
+            var imageCounts = await imageRepository.FindAsync(new SearchOptions<Image>
+            {
+                Query = i => i.CategoryId != null
+            }, i => i.CategoryId);
 
             var countByCategory = imageCounts
                 .GroupBy(id => id)

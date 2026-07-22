@@ -9,9 +9,10 @@ public class TagService(
     {
         try
         {
-            var tags = await tagRepository.FindAsync(
-                new SearchOptions<Tag> { OrderBy = query => query.OrderBy(t => t.Name) },
-                t => new TagItem(t.Id, t.Name, t.ImageTags.Count));
+            var tags = await tagRepository.FindAsync(new SearchOptions<Tag>
+            {
+                OrderBy = query => query.OrderBy(t => t.Name)
+            }, t => new TagItem(t.Id, t.Name, t.ImageTags.Count));
 
             var items = tags.ToList();
 

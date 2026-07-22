@@ -45,6 +45,5 @@ public class PerceptualHashService : IPerceptualHashService
         return unchecked((long)hash);
     }
 
-    public int HammingDistance(long hashA, long hashB)
-        => BitOperations.PopCount(unchecked((ulong)(hashA ^ hashB)));
+    public int HammingDistance(long hashA, long hashB) => BitOperations.PopCount(unchecked((ulong)(hashA ^ hashB)));
 }
