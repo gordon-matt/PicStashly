@@ -1,3 +1,4 @@
+using System.Net;
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.StaticFiles;
 using Microsoft.Extensions.FileProviders;
@@ -32,7 +33,24 @@ bool useKeycloak = authProviderName.Equals("Keycloak", StringComparison.OrdinalI
 
 builder.Services.AddPicStashlyAuthentication(builder.Configuration, useKeycloak);
 
-builder.Services.AddControllersWithViews()
+// Shapes the JSON bodies produced when a service Result is translated to a failed HTTP response
+// (via the [TranslateResultToActionResult] attribute) into a simple { message } object, which is
+// what the frontend's fetch() calls expect.
+builder.Services.AddControllersWithViews(mvcOptions => mvcOptions
+    .AddResultConvention(resultStatusMap => resultStatusMap
+        .AddDefaultMap()
+        .For(ResultStatus.Invalid, HttpStatusCode.BadRequest, options => options
+            .With((_, result) => new
+            {
+                message = result.ValidationErrors.FirstOrDefault()?.ErrorMessage ?? "Invalid request.",
+                errors = result.ValidationErrors
+            }))
+        .For(ResultStatus.NotFound, HttpStatusCode.NotFound, options => options
+            .With((_, result) => new { message = result.Errors.FirstOrDefault() ?? "Not found." }))
+        .For(ResultStatus.Error, HttpStatusCode.InternalServerError, options => options
+            .With((_, result) => new { message = result.Errors.FirstOrDefault() ?? "An error occurred." }))
+        .For(ResultStatus.Conflict, HttpStatusCode.Conflict, options => options
+            .With((_, result) => new { message = result.Errors.FirstOrDefault() ?? "A conflict occurred." }))))
     .AddNewtonsoftJson();
 
 builder.Services.AddRazorPages();

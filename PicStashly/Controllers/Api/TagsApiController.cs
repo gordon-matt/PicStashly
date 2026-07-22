@@ -3,6 +3,7 @@ namespace PicStashly.Controllers.Api;
 [ApiController]
 [Authorize]
 [Route("api/tags")]
+[TranslateResultToActionResult]
 public class TagsApiController : ControllerBase
 {
     private readonly ITagService tagService;
@@ -13,30 +14,15 @@ public class TagsApiController : ControllerBase
     }
 
     [HttpGet]
-    public async Task<IActionResult> GetTags()
-    {
-        var result = await tagService.GetTagsAsync();
-        return result.ToActionResult(this, value => Ok(new { tags = value }));
-    }
+    public Task<Result<List<TagItem>>> GetTags() => tagService.GetTagsAsync();
 
     [HttpPut("{id:int}")]
-    public async Task<IActionResult> Rename(int id, [FromBody] RenameTagRequest request)
-    {
-        var result = await tagService.RenameTagAsync(id, request);
-        return result.ToActionResult(this, value => Ok(value));
-    }
+    public Task<Result<TagItem>> Rename(int id, [FromBody] RenameTagRequest request) =>
+        tagService.RenameTagAsync(id, request);
 
     [HttpPost("merge")]
-    public async Task<IActionResult> Merge([FromBody] MergeTagsRequest request)
-    {
-        var result = await tagService.MergeTagsAsync(request);
-        return result.ToActionResult(this, () => Ok(new { message = "Tags merged." }));
-    }
+    public Task<Result> Merge([FromBody] MergeTagsRequest request) => tagService.MergeTagsAsync(request);
 
     [HttpDelete("{id:int}")]
-    public async Task<IActionResult> Delete(int id)
-    {
-        var result = await tagService.DeleteTagAsync(id);
-        return result.ToActionResult(this, () => Ok(new { message = "Tag deleted." }));
-    }
+    public Task<Result> Delete(int id) => tagService.DeleteTagAsync(id);
 }

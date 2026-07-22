@@ -1,4 +1,5 @@
 import { getTagifyOptions, loadTagWhitelist } from './tagify-options.js';
+import { loadCategories } from './categories-shared.js';
 
 const PAGE_SIZE = 60;
 
@@ -12,6 +13,8 @@ class LibraryViewModel {
         // Filters
         this.searchQuery = ko.observable('');
         this.tagFilter = ko.observable('');
+        this.categoryFilter = ko.observable('');
+        this.categories = ko.observableArray([]);
         this.untaggedOnly = ko.observable(false);
         this.sort = ko.observable('newest');
         this.shuffleSeed = Math.floor(Math.random() * 2147483647);
@@ -29,7 +32,7 @@ class LibraryViewModel {
         this.lightboxImage = ko.observable(null);
 
         this.hasActiveFilters = ko.computed(() =>
-            !!this.searchQuery() || !!this.tagFilter() || this.untaggedOnly());
+            !!this.searchQuery() || !!this.tagFilter() || !!this.categoryFilter() || this.untaggedOnly());
 
         // Debounced search
         let searchTimeout = null;
@@ -39,6 +42,7 @@ class LibraryViewModel {
         });
 
         this.untaggedOnly.subscribe(() => this.reload());
+        this.categoryFilter.subscribe(() => this.reload());
         this.sort.subscribe(() => {
             this.shuffleSeed = Math.floor(Math.random() * 2147483647);
             this.reload();
@@ -51,9 +55,17 @@ class LibraryViewModel {
         this._tagWhitelist = [];
     }
 
-    init = async () => {
+    // Loads data the initial bindings depend on (category dropdown options, tag whitelist).
+    // Must run BEFORE ko.applyBindings: populating the "categories" observableArray afterwards
+    // would rebuild the category <select>'s options while it's already bound, and Knockout can
+    // spuriously write a value back onto "categoryFilter" when it does — which, combined with the
+    // .subscribe(reload) below, triggered a second, overlapping "page 1" load on every page open.
+    loadFilterData = async () => {
         this._tagWhitelist = await loadTagWhitelist();
+        this.categories(await loadCategories());
+    };
 
+    init = async () => {
         this._tagFilterTagify = new Tagify(
             document.getElementById('tagFilterInput'),
             getTagifyOptions(this._tagWhitelist));
@@ -93,13 +105,17 @@ class LibraryViewModel {
             });
             if (this.searchQuery()) params.set('search', this.searchQuery());
             if (this.tagFilter()) params.set('tags', this.tagFilter());
+            if (this.categoryFilter()) params.set('categoryId', this.categoryFilter());
             if (this.untaggedOnly()) params.set('untaggedOnly', 'true');
             if (this.sort() === 'random') params.set('shuffleSeed', this.shuffleSeed);
 
             const response = await fetch(`/api/images/search?${params}`);
             const data = await response.json();
 
-            const items = data.images || [];
+            // Defensive de-dup: guards against ever double-appending the same page again
+            // (e.g. a stray overlapping reload), regardless of what triggered it.
+            const existingIds = new Set(this.images().map(i => i.id));
+            const items = (data.images || []).filter(i => !existingIds.has(i.id));
             ko.utils.arrayPushAll(this.images, items);
             this.totalCount(data.totalCount ?? 0);
             this.hasMore(this.currentPage < (data.totalPages ?? 0));
@@ -125,6 +141,7 @@ class LibraryViewModel {
     clearFilters = () => {
         this.searchQuery('');
         this.tagFilter('');
+        this.categoryFilter('');
         this.untaggedOnly(false);
         if (this._tagFilterTagify) this._tagFilterTagify.removeAllTags();
         this.reload();
@@ -219,6 +236,16 @@ class LibraryViewModel {
         setTimeout(() => this._initLightboxTags(image), 0);
     };
 
+    // Quick access straight from the grid tile: open the lightbox with focus already in the tags input.
+    editItemTags = (image) => {
+        this.openLightbox(image);
+        setTimeout(() => this._focusLightboxTagsInput(), 30);
+    };
+
+    _focusLightboxTagsInput = () => {
+        document.querySelector('#lightboxTagsInput')?.closest('.tagify')?.querySelector('.tagify__input')?.focus();
+    };
+
     closeLightbox = () => {
         this.lightboxImage(null);
         document.body.style.overflow = '';
@@ -280,7 +307,7 @@ class LibraryViewModel {
 
             if (response.ok) {
                 const data = await response.json();
-                image.tags = data.tags || tagNames;
+                image.tags = data || tagNames;
                 this.images.valueHasMutated();
             } else {
                 toast.error('Failed to save tags.');
@@ -288,6 +315,37 @@ class LibraryViewModel {
         } catch (error) {
             console.error('Error saving tags:', error);
             toast.error('Failed to save tags.');
+        }
+    };
+
+    changeLightboxCategory = async () => {
+        const image = this.lightboxImage();
+        if (!image) return;
+
+        // The select's value binding already wrote the new id straight onto the image object;
+        // read it back out so we know what to send (empty string means "no category").
+        const categoryId = image.categoryId ? Number(image.categoryId) : null;
+
+        try {
+            const response = await fetch(`/api/images/${image.id}/category`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ categoryId })
+            });
+
+            const data = await response.json().catch(() => ({}));
+
+            if (response.ok) {
+                image.categoryId = data.categoryId ?? null;
+                image.categoryName = data.categoryName ?? null;
+                this.images.valueHasMutated();
+                toast.success('Category updated.');
+            } else {
+                toast.error(data.message || 'Failed to update category.');
+            }
+        } catch (error) {
+            console.error('Error updating category:', error);
+            toast.error('Failed to update category.');
         }
     };
 
@@ -366,7 +424,7 @@ class LibraryViewModel {
                     this.lightboxNext();
                 } else if (e.key === 't') {
                     e.preventDefault();
-                    document.querySelector('#lightboxTagsInput')?.closest('.tagify')?.querySelector('.tagify__input')?.focus();
+                    this._focusLightboxTagsInput();
                 } else if (e.key === 'Delete') {
                     this.deleteLightboxImage();
                 }
@@ -441,6 +499,7 @@ var viewModel;
 
 document.addEventListener('DOMContentLoaded', async () => {
     viewModel = new LibraryViewModel();
+    await viewModel.loadFilterData();
     ko.applyBindings(viewModel);
     await viewModel.init();
 });

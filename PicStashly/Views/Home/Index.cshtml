@@ -6,12 +6,16 @@
     <!-- Sticky filter bar -->
     <div class="filter-bar">
         <div class="row g-2 align-items-center">
-            <div class="col-12 col-md-3">
+            <div class="col-12 col-md-2">
                 <input type="text" class="form-control" placeholder="Search filename, tags, text..."
                        data-bind="value: searchQuery, valueUpdate: 'afterkeydown'" />
             </div>
-            <div class="col-12 col-md-3">
+            <div class="col-12 col-md-2">
                 <input id="tagFilterInput" class="form-control" placeholder="Filter by tags..." />
+            </div>
+            <div class="col-6 col-md-2">
+                <select class="form-select" data-bind="value: categoryFilter, options: categories, optionsText: 'name', optionsValue: 'id', optionsCaption: 'All categories'">
+                </select>
             </div>
             <div class="col-6 col-md-2">
                 <select class="form-select" data-bind="value: sort">
@@ -26,7 +30,7 @@
                     <label class="form-check-label" for="untaggedToggle">Untagged only</label>
                 </div>
             </div>
-            <div class="col-12 col-md-2 d-flex gap-2 justify-content-md-end">
+            <div class="col-6 col-md-2 d-flex gap-2 justify-content-md-end">
                 <button class="btn btn-outline-secondary" data-bind="click: clearFilters" title="Clear filters">
                     <i class="bi bi-x-circle"></i>
                 </button>
@@ -83,6 +87,11 @@
             <input type="checkbox" class="form-check-input select-check"
                    data-bind="visible: $parent.selectionMode, checked: $parent.isSelected($data),
                               event: { click: function (d, e) { e.stopPropagation(); $parent.toggleSelected($data); return true; } }" />
+            <button type="button" class="btn btn-sm btn-secondary item-edit-tags" title="Edit tags"
+                    data-bind="visible: !$parent.selectionMode(),
+                               event: { click: function (d, e) { e.stopPropagation(); $parent.editItemTags($data); return true; } }">
+                <i class="bi bi-pencil"></i>
+            </button>
             <button type="button" class="btn btn-sm btn-danger item-delete" title="Delete"
                     data-bind="visible: !$parent.selectionMode(),
                                event: { click: function (d, e) { e.stopPropagation(); $parent.deleteItem($data); return true; } }">
@@ -121,6 +130,10 @@
 
     <div class="lightbox-toolbar">
         <input id="lightboxTagsInput" class="form-control form-control-sm lightbox-tags-input" placeholder="Tags... (press t to focus)" />
+        <select class="form-select form-select-sm lightbox-category-select"
+                data-bind="value: categoryId, options: $parent.categories, optionsText: 'name', optionsValue: 'id', optionsCaption: 'No category',
+                           event: { change: function () { $parent.changeLightboxCategory(); return true; } }">
+        </select>
         <span class="text-light small flex-grow-1 text-truncate" data-bind="text: fileName"></span>
         <a class="btn btn-sm btn-outline-light" data-bind="attr: { href: '/image/' + id }" title="Details">
             <i class="bi bi-info-circle"></i>

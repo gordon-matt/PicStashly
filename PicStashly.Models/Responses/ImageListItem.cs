@@ -8,4 +8,6 @@ public record ImageListItem(
     int Width,
     int Height,
     DateTime DateAdded,
-    List<string> Tags);
+    List<string> Tags,
+    int? CategoryId,
+    string? CategoryName);

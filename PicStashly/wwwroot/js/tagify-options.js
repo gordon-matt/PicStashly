@@ -31,7 +31,7 @@ export async function loadTagWhitelist() {
     try {
         const response = await fetch('/api/tags');
         const data = await response.json();
-        return (data.tags || []).map(t => t.name);
+        return (data || []).map(t => t.name);
     } catch (e) {
         console.error('Error loading tag whitelist', e);
         return [];

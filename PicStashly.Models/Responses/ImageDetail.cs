@@ -13,4 +13,6 @@ public record ImageDetail(
     string? OcrText,
     string? SourceUrl,
     DateTime DateAdded,
-    List<string> Tags);
+    List<string> Tags,
+    int? CategoryId,
+    string? CategoryName);

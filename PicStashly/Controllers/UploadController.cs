@@ -32,7 +32,7 @@ public class UploadController : Controller
         foreach (var file in images)
         {
             using var stream = file.OpenReadStream();
-            var result = await imageService.IngestAsync(stream, file.FileName, sourceUrl: null, tagNames: null, force: false);
+            var result = await imageService.IngestAsync(stream, file.FileName, sourceUrl: null, tagNames: null, categoryId: null, force: false);
 
             if (!result.IsSuccess)
             {

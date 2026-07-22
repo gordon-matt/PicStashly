@@ -32,6 +32,11 @@ public class Image : BaseEntity<int>
 
     public DateTime DateAdded { get; set; }
 
+    /// <summary>Optional category the image is filed under. Also determines its storage subfolder.</summary>
+    public int? CategoryId { get; set; }
+
+    public virtual Category? Category { get; set; }
+
     public virtual ICollection<ImageTag> ImageTags { get; set; } = [];
 }
 
@@ -49,5 +54,10 @@ public class ImageMap : IEntityTypeConfiguration<Image>
         builder.Property(m => m.SourceUrl).HasMaxLength(2048);
         builder.HasIndex(m => m.PerceptualHash);
         builder.HasIndex(m => m.DateAdded);
+        builder.HasIndex(m => m.CategoryId);
+        builder.HasOne(m => m.Category)
+            .WithMany()
+            .HasForeignKey(m => m.CategoryId)
+            .OnDelete(DeleteBehavior.SetNull);
     }
 }

@@ -1,5 +1,8 @@
 <Solution>
   <Project Path="PicStashly/PicStashly.csproj" />
+  <Project Path="docker-compose.dcproj" Id="c632682e-c37d-4679-a9a7-f244e83cc991">
+    <Build />
+  </Project>
   <Project Path="PicStashly.Core/PicStashly.Core.csproj" />
   <Project Path="PicStashly.Data/PicStashly.Data.csproj" />
   <Project Path="PicStashly.Data.Npgsql/PicStashly.Data.Npgsql.csproj" />

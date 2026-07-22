@@ -1,4 +1,5 @@
 import { getTagifyOptions, loadTagWhitelist } from './tagify-options.js';
+import { loadCategories } from './categories-shared.js';
 
 let nextQueueId = 1;
 
@@ -19,14 +20,20 @@ class UploadQueueItem {
 class UploadViewModel {
     constructor() {
         this.queue = ko.observableArray([]);
+        this.categories = ko.observableArray([]);
+        this.selectedCategoryId = ko.observable('');
         this._batchTagify = null;
         this._tagWhitelist = [];
         this._processing = false;
     }
 
-    init = async () => {
+    // Must run BEFORE ko.applyBindings — see the comment on the equivalent method in library.js.
+    loadFilterData = async () => {
         this._tagWhitelist = await loadTagWhitelist();
+        this.categories(await loadCategories());
+    };
 
+    init = async () => {
         this._batchTagify = new Tagify(
             document.getElementById('batchTagsInput'),
             getTagifyOptions(this._tagWhitelist));
@@ -103,6 +110,9 @@ class UploadViewModel {
             const batchTags = this._batchTagify.value.map(t => t.value);
             if (batchTags.length > 0) {
                 formData.append('tags', batchTags.join(','));
+            }
+            if (this.selectedCategoryId()) {
+                formData.append('categoryId', this.selectedCategoryId());
             }
 
             const response = await fetch('/api/images/upload', { method: 'POST', body: formData });
@@ -216,6 +226,7 @@ var viewModel;
 
 document.addEventListener('DOMContentLoaded', async () => {
     viewModel = new UploadViewModel();
+    await viewModel.loadFilterData();
     ko.applyBindings(viewModel);
     await viewModel.init();
 });

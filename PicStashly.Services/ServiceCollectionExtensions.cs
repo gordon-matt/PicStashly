@@ -25,6 +25,7 @@ public static class ServiceCollectionExtensions
 
             services.AddScoped<IImageService, ImageService>();
             services.AddScoped<ITagService, TagService>();
+            services.AddScoped<ICategoryService, CategoryService>();
             services.AddScoped<IAdminService, AdminService>();
 
             return services;

@@ -17,7 +17,7 @@ class TagsViewModel {
         try {
             const response = await fetch('/api/tags');
             const data = await response.json();
-            this.tags(data.tags || []);
+            this.tags(data || []);
         } catch (error) {
             console.error('Error loading tags:', error);
             toast.error('Failed to load tags.');

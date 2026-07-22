@@ -92,21 +92,31 @@ body {
   outline-offset: -3px;
 }
 
-.masonry-item .item-delete {
+.masonry-item .item-delete,
+.masonry-item .item-edit-tags {
   position: absolute;
   top: 0.4rem;
-  right: 0.4rem;
   z-index: 2;
   padding: 0.15rem 0.4rem;
   opacity: 0;
   transition: opacity 0.15s ease-in-out;
 }
 
-.masonry-item:hover .item-delete {
+.masonry-item .item-delete {
+  right: 0.4rem;
+}
+
+.masonry-item .item-edit-tags {
+  right: 2.2rem;
+}
+
+.masonry-item:hover .item-delete,
+.masonry-item:hover .item-edit-tags {
   opacity: 0.85;
 }
 
-.masonry-item .item-delete:hover {
+.masonry-item .item-delete:hover,
+.masonry-item .item-edit-tags:hover {
   opacity: 1;
 }
 
@@ -177,6 +187,11 @@ body {
 .lightbox-tags-input {
   min-width: 280px;
   max-width: 480px;
+}
+
+.lightbox-category-select {
+  width: auto;
+  max-width: 200px;
 }
 
 /* ── Upload page ──────────────────────────────────────────────────────── */

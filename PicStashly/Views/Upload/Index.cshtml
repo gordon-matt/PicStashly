@@ -17,13 +17,21 @@
         <input type="file" id="fileInput" multiple accept="image/*" class="d-none" />
     </div>
 
-    <!-- Batch tags -->
+    <!-- Batch tags / category -->
     <div class="row g-2 mb-4 align-items-center">
         <div class="col-auto">
             <label for="batchTagsInput" class="col-form-label">Batch tags:</label>
         </div>
         <div class="col">
             <input id="batchTagsInput" class="form-control" placeholder="Tags applied to every image in this batch..." />
+        </div>
+        <div class="col-auto">
+            <label for="batchCategorySelect" class="col-form-label">Category:</label>
+        </div>
+        <div class="col-auto">
+            <select id="batchCategorySelect" class="form-select"
+                    data-bind="value: selectedCategoryId, options: categories, optionsText: 'name', optionsValue: 'id', optionsCaption: 'None'">
+            </select>
         </div>
     </div>
 

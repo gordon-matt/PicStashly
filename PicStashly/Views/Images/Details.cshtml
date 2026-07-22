@@ -23,6 +23,14 @@
             </div>
 
             <div class="mb-3">
+                <label class="form-label fw-semibold">Category</label>
+                <select id="detailCategorySelect" class="form-select"
+                        data-bind="value: $parent.categoryId, options: $parent.categories, optionsText: 'name', optionsValue: 'id', optionsCaption: 'No category',
+                                   event: { change: function () { $parent.changeCategory(); return true; } }">
+                </select>
+            </div>
+
+            <div class="mb-3">
                 <label class="form-label fw-semibold d-flex justify-content-between align-items-center">
                     Extracted text (OCR)
                     <button class="btn btn-sm btn-outline-primary" data-bind="click: $parent.saveOcrText, enable: $parent.ocrTextDirty">

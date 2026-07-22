@@ -11,8 +11,11 @@ Think of it as a personal visual search engine, not a photo manager.
   images straight into the app.
 - **Tags, not albums**: flat multi-tag model with autocomplete, bulk-tag mode, and a tag
   management page (rename / merge / delete with usage counts).
+- **Categories**: an optional single category per image (e.g. "Memes", "Reaction Images") with its
+  own management page (create / rename / delete). Images are stored on disk under a matching
+  `images/{category-slug}/...` subfolder, so the folder layout stays human-readable.
 - **Search-first library**: masonry grid with infinite scroll, combined search across filename,
-  tags and OCR text, tag filters, "untagged only" toggle, and random shuffle.
+  tags and OCR text, tag and category filters, "untagged only" toggle, and random shuffle.
 - **Dedup on ingest**: a 64-bit perceptual hash (dHash) is computed for every image; near-duplicates
   are flagged on upload with a "view existing / save anyway / merge tags" prompt.
 - **OCR**: meme captions are extracted with [tesseract](https://github.com/tesseract-ocr/tesseract)
@@ -20,7 +23,8 @@ Think of it as a personal visual search engine, not a photo manager.
 - **Automatic downscaling**: images larger than the configured maximum are resized on upload
   (aspect ratio preserved, original format kept); WebP thumbnails are generated for the grid.
 - **Lightbox** with keyboard navigation: `←`/`→` prev/next, `t` focus tags, `Esc` close, `Del` delete.
-- **Delete** from the grid (hover an image tile), the lightbox, or the image details page.
+- **Quick actions on the grid**: hover an image tile to edit its tags or delete it without opening
+  the lightbox; the lightbox and image details page also support delete and category reassignment.
 - **Authentication**: the whole app sits behind a login screen — built-in ASP.NET Core Identity
   by default (a local admin account is created on first run), or Keycloak for centralised
   single sign-on if you already run it for other self-hosted apps.

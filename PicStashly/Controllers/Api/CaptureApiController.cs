@@ -4,6 +4,7 @@ namespace PicStashly.Controllers.Api;
 [ApiController]
 [Authorize]
 [Route("api/capture")]
+[TranslateResultToActionResult]
 public class CaptureApiController : ControllerBase
 {
     private readonly IImageService imageService;
@@ -14,9 +15,9 @@ public class CaptureApiController : ControllerBase
     }
 
     [HttpPost]
-    public async Task<IActionResult> Capture([FromBody] CaptureRequest request, [FromQuery] bool force = false, CancellationToken cancellationToken = default)
-    {
-        var result = await imageService.IngestFromUrlAsync(request, force, cancellationToken);
-        return result.ToActionResult(this, value => Ok(value));
-    }
+    public Task<Result<IngestResult>> Capture(
+        [FromBody] CaptureRequest request,
+        [FromQuery] bool force = false,
+        CancellationToken cancellationToken = default) =>
+        imageService.IngestFromUrlAsync(request, force, cancellationToken);
 }

@@ -16,6 +16,7 @@ public interface IImageService
         string fileName,
         string? sourceUrl,
         List<string>? tagNames,
+        int? categoryId,
         bool force,
         CancellationToken cancellationToken = default);
 
@@ -25,6 +26,9 @@ public interface IImageService
     Task<Result> DeleteAsync(int id);
 
     Task<Result<List<string>>> SetTagsAsync(int id, SetImageTagsRequest request);
+
+    /// <summary>Reassigns (or clears) an image's category, moving its stored files into the new category's subfolder.</summary>
+    Task<Result<ImageDetail>> SetCategoryAsync(int id, SetImageCategoryRequest request);
 
     Task<Result> UpdateOcrTextAsync(int id, UpdateOcrTextRequest request);
 

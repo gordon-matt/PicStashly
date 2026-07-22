@@ -1,3 +1,4 @@
+using System.Text;
 using Microsoft.Extensions.Options;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.Formats;
@@ -13,6 +14,13 @@ namespace PicStashly.Services;
 
 public class FileStorageService(IConfiguration configuration, IOptions<ImageProcessingOptions> imageOptions) : IFileStorageService
 {
+    private const string UncategorizedFolder = "uncategorized";
+    private const string ReservationExtension = ".reserved";
+
+    // Guards the "pick a unique yyyyMMdd_HHmmss_{n} name for this category folder" critical section
+    // so that concurrent uploads (e.g. a batch) never collide on the same second.
+    private static readonly object namingLock = new();
+
     private string BasePath => configuration["FileStorage:BasePath"]
         ?? Path.Combine(Directory.GetCurrentDirectory(), "uploads");
 
@@ -30,7 +38,18 @@ public class FileStorageService(IConfiguration configuration, IOptions<ImageProc
         }
     }
 
-    public async Task<StoredImageFile> SaveImageAsync(Stream sourceStream, string originalFileName, CancellationToken cancellationToken = default)
+    public string GetCategoryFolderName(int? categoryId, string? categoryName)
+    {
+        if (categoryId is null || string.IsNullOrWhiteSpace(categoryName))
+        {
+            return UncategorizedFolder;
+        }
+
+        string slug = Slugify(categoryName);
+        return string.IsNullOrEmpty(slug) ? $"category-{categoryId}" : slug;
+    }
+
+    public async Task<StoredImageFile> SaveImageAsync(Stream sourceStream, string originalFileName, string categoryFolder, CancellationToken cancellationToken = default)
     {
         var opts = imageOptions.Value;
 
@@ -40,62 +59,86 @@ public class FileStorageService(IConfiguration configuration, IOptions<ImageProc
         buffer.Position = 0;
 
         string extension = Path.GetExtension(originalFileName).ToLowerInvariant();
-        string name = Guid.NewGuid().ToString("N");
 
-        // Hashed subfolder structure (e.g. images/ab/cd/abcd....png) so no single directory grows huge.
-        string subfolder = $"{name[..2]}/{name[2..4]}";
-        string storageRelative = $"{Constants.FileStorage.Images}/{subfolder}/{name}{extension}";
-        string storageFull = GetFullPath(storageRelative);
-        Directory.CreateDirectory(Path.GetDirectoryName(storageFull)!);
+        string imagesDir = GetFullPath($"{Constants.FileStorage.Images}/{categoryFolder}");
+        Directory.CreateDirectory(imagesDir);
 
-        using var image = await ImageSharpImage.LoadAsync(buffer, cancellationToken);
-        int width = image.Width;
-        int height = image.Height;
+        string fileBaseName = ReserveFileBaseName(imagesDir);
+        string reservationPath = Path.Combine(imagesDir, fileBaseName + ReservationExtension);
 
-        bool needsResize = opts.AutoShrinkImages && (width > opts.MaxWidth || height > opts.MaxHeight);
-        if (needsResize)
+        try
         {
-            // Resize preserves the original format (and animation frames for GIF/WebP).
-            image.Mutate(x => x.Resize(new ResizeOptions
+            string storageRelative = $"{Constants.FileStorage.Images}/{categoryFolder}/{fileBaseName}{extension}";
+            string storageFull = GetFullPath(storageRelative);
+
+            using var image = await ImageSharpImage.LoadAsync(buffer, cancellationToken);
+            int width = image.Width;
+            int height = image.Height;
+
+            bool needsResize = opts.AutoShrinkImages && (width > opts.MaxWidth || height > opts.MaxHeight);
+            if (needsResize)
             {
-                Mode = ResizeMode.Max,
-                Size = new Size(opts.MaxWidth, opts.MaxHeight)
-            }));
+                // Resize preserves the original format (and animation frames for GIF/WebP).
+                image.Mutate(x => x.Resize(new ResizeOptions
+                {
+                    Mode = ResizeMode.Max,
+                    Size = new Size(opts.MaxWidth, opts.MaxHeight)
+                }));
 
-            width = image.Width;
-            height = image.Height;
+                width = image.Width;
+                height = image.Height;
 
-            await image.SaveAsync(storageFull, GetEncoder(extension, opts.Quality), cancellationToken);
+                await image.SaveAsync(storageFull, GetEncoder(extension, opts.Quality), cancellationToken);
+            }
+            else
+            {
+                // No processing needed — store the original bytes untouched.
+                buffer.Position = 0;
+                await using var fs = new FileStream(storageFull, FileMode.Create);
+                await buffer.CopyToAsync(fs, cancellationToken);
+            }
+
+            string thumbnailRelative = await GenerateThumbnailAsync(image, fileBaseName, categoryFolder, cancellationToken);
+
+            long fileSize = new FileInfo(storageFull).Length;
+
+            return new StoredImageFile(
+                storageRelative,
+                thumbnailRelative,
+                GetContentType(extension),
+                fileSize,
+                width,
+                height);
         }
-        else
+        finally
         {
-            // No processing needed — store the original bytes untouched.
-            buffer.Position = 0;
-            await using var fs = new FileStream(storageFull, FileMode.Create);
-            await buffer.CopyToAsync(fs, cancellationToken);
+            if (File.Exists(reservationPath))
+            {
+                File.Delete(reservationPath);
+            }
         }
-
-        string thumbnailRelative = await GenerateThumbnailAsync(image, name, subfolder, cancellationToken);
-
-        long fileSize = new FileInfo(storageFull).Length;
-
-        return new StoredImageFile(
-            storageRelative,
-            thumbnailRelative,
-            GetContentType(extension),
-            fileSize,
-            width,
-            height);
     }
 
     public async Task<string> RegenerateThumbnailAsync(string storagePath, CancellationToken cancellationToken = default)
     {
         string fullPath = GetFullPath(storagePath);
-        string name = Path.GetFileNameWithoutExtension(storagePath);
-        string subfolder = $"{name[..2]}/{name[2..4]}";
+        string fileBaseName = Path.GetFileNameWithoutExtension(storagePath);
+        string categoryFolder = GetCategoryFolderFromPath(storagePath);
 
         using var image = await ImageSharpImage.LoadAsync(fullPath, cancellationToken);
-        return await GenerateThumbnailAsync(image, name, subfolder, cancellationToken);
+        return await GenerateThumbnailAsync(image, fileBaseName, categoryFolder, cancellationToken);
+    }
+
+    public Task<(string StoragePath, string ThumbnailPath)> MoveToCategoryAsync(
+        string currentStoragePath, string currentThumbnailPath, string newCategoryFolder, CancellationToken cancellationToken = default)
+    {
+        string newStorageRelative = $"{Constants.FileStorage.Images}/{newCategoryFolder}/{Path.GetFileName(currentStoragePath)}";
+        string newThumbnailRelative = $"{Constants.FileStorage.Thumbnails}/{newCategoryFolder}/{Path.GetFileName(currentThumbnailPath)}";
+
+        MoveFileIfChanged(currentStoragePath, newStorageRelative);
+        MoveFileIfChanged(currentThumbnailPath, newThumbnailRelative);
+
+        return Task.FromResult((newStorageRelative, newThumbnailRelative));
     }
 
     public IEnumerable<string> EnumerateImageFiles()
@@ -108,16 +151,98 @@ public class FileStorageService(IConfiguration configuration, IOptions<ImageProc
 
         foreach (string file in Directory.EnumerateFiles(imagesRoot, "*", SearchOption.AllDirectories))
         {
+            if (file.EndsWith(ReservationExtension, StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
             yield return Path.GetRelativePath(BasePath, file).Replace('\\', '/');
         }
     }
 
-    private async Task<string> GenerateThumbnailAsync(ImageSharpImage image, string name, string subfolder, CancellationToken cancellationToken)
+    private void MoveFileIfChanged(string currentRelativePath, string newRelativePath)
+    {
+        string currentFull = GetFullPath(currentRelativePath);
+        string newFull = GetFullPath(newRelativePath);
+
+        if (string.Equals(currentFull, newFull, StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        if (!File.Exists(currentFull))
+        {
+            return;
+        }
+
+        Directory.CreateDirectory(Path.GetDirectoryName(newFull)!);
+        File.Move(currentFull, newFull, overwrite: true);
+    }
+
+    private static string ReserveFileBaseName(string imagesDir)
+    {
+        lock (namingLock)
+        {
+            string timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
+            int n = 1;
+            string candidate;
+            while (true)
+            {
+                candidate = $"{timestamp}_{n}";
+                if (Directory.GetFiles(imagesDir, $"{candidate}.*").Length == 0)
+                {
+                    break;
+                }
+                n++;
+            }
+
+            // Reserve the name immediately (before the slower decode/resize/save work happens) so a
+            // concurrent call in the same second doesn't pick the same {n}.
+            File.Create(Path.Combine(imagesDir, candidate + ReservationExtension)).Dispose();
+            return candidate;
+        }
+    }
+
+    private static string GetCategoryFolderFromPath(string relativePath)
+    {
+        // Expected shape: "images/{categoryFolder}/{fileName}"
+        string[] parts = relativePath.Split('/');
+        return parts.Length >= 3 ? parts[1] : UncategorizedFolder;
+    }
+
+    private static string Slugify(string value)
+    {
+        var sb = new StringBuilder(value.Length);
+        bool lastWasSeparator = true; // suppresses a leading '-'
+
+        foreach (char c in value.Trim().ToLowerInvariant())
+        {
+            if (char.IsLetterOrDigit(c))
+            {
+                sb.Append(c);
+                lastWasSeparator = false;
+            }
+            else if (!lastWasSeparator)
+            {
+                sb.Append('-');
+                lastWasSeparator = true;
+            }
+        }
+
+        while (sb.Length > 0 && sb[^1] == '-')
+        {
+            sb.Length--;
+        }
+
+        return sb.ToString();
+    }
+
+    private async Task<string> GenerateThumbnailAsync(ImageSharpImage image, string fileBaseName, string categoryFolder, CancellationToken cancellationToken)
     {
         var opts = imageOptions.Value;
 
         // WebP thumbnails: small, and unlike JPEG they keep transparency intact.
-        string thumbnailRelative = $"{Constants.FileStorage.Thumbnails}/{subfolder}/{name}.webp";
+        string thumbnailRelative = $"{Constants.FileStorage.Thumbnails}/{categoryFolder}/{fileBaseName}.webp";
         string thumbnailFull = GetFullPath(thumbnailRelative);
         Directory.CreateDirectory(Path.GetDirectoryName(thumbnailFull)!);
 

@@ -1,5 +1,6 @@
 import { formatDateTime, formatFileSize } from './utils.js';
 import { getTagifyOptions, loadTagWhitelist } from './tagify-options.js';
+import { loadCategories } from './categories-shared.js';
 
 class ImageDetailsViewModel {
     constructor(imageId) {
@@ -8,6 +9,8 @@ class ImageDetailsViewModel {
         this.loading = ko.observable(true);
         this.ocrText = ko.observable('');
         this.savedOcrText = ko.observable('');
+        this.categoryId = ko.observable(null);
+        this.categories = ko.observableArray([]);
 
         this.ocrTextDirty = ko.computed(() => this.ocrText() !== this.savedOcrText());
 
@@ -16,6 +19,11 @@ class ImageDetailsViewModel {
 
         this._tagify = null;
     }
+
+    // Must run BEFORE ko.applyBindings — see the comment on the equivalent method in library.js.
+    loadFilterData = async () => {
+        this.categories(await loadCategories());
+    };
 
     init = async () => {
         try {
@@ -29,6 +37,7 @@ class ImageDetailsViewModel {
             this.image(data);
             this.ocrText(data.ocrText || '');
             this.savedOcrText(data.ocrText || '');
+            this.categoryId(data.categoryId ?? null);
 
             await this._initTags(data);
         } catch (error) {
@@ -61,6 +70,31 @@ class ImageDetailsViewModel {
                 toast.error('Failed to save tags.');
             }
         });
+    };
+
+    changeCategory = async () => {
+        const categoryId = this.categoryId() ? Number(this.categoryId()) : null;
+
+        try {
+            const response = await fetch(`/api/images/${this.imageId}/category`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ categoryId })
+            });
+
+            const data = await response.json().catch(() => ({}));
+
+            if (response.ok) {
+                this.image(data);
+                this.categoryId(data.categoryId ?? null);
+                toast.success('Category updated.');
+            } else {
+                toast.error(data.message || 'Failed to update category.');
+            }
+        } catch (error) {
+            console.error('Error updating category:', error);
+            toast.error('Failed to update category.');
+        }
     };
 
     saveOcrText = async () => {
@@ -109,6 +143,7 @@ var viewModel;
 
 document.addEventListener('DOMContentLoaded', async () => {
     viewModel = new ImageDetailsViewModel(imageId);
+    await viewModel.loadFilterData();
     ko.applyBindings(viewModel);
     await viewModel.init();
 });

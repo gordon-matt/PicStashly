@@ -9,6 +9,8 @@ public abstract class ApplicationDbContextBase : IdentityDbContext<ApplicationUs
     {
     }
 
+    public DbSet<Category> Categories { get; set; }
+
     public DbSet<Image> Images { get; set; }
 
     public DbSet<Tag> Tags { get; set; }

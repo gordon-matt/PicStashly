@@ -61,6 +61,11 @@
                                 <i class="bi bi-tags"></i> Tags
                             </a>
                         </li>
+                        <li class="nav-item">
+                            <a class="nav-link" asp-area="" asp-controller="Categories" asp-action="Index">
+                                <i class="bi bi-folder2-open"></i> Categories
+                            </a>
+                        </li>
                         @if (User.IsInRole(Constants.Roles.Administrator))
                         {
                             <li class="nav-item">

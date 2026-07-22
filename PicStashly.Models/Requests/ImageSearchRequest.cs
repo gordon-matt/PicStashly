@@ -5,6 +5,7 @@ public record ImageSearchRequest(
     int PageSize = 60,
     string? Search = null,
     string? Tags = null,
+    int? CategoryId = null,
     bool UntaggedOnly = false,
     DateTime? DateFrom = null,
     DateTime? DateTo = null,

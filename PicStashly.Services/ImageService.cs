@@ -9,7 +9,8 @@ public class ImageService(
     IOcrService ocr,
     IRepository<Image> imageRepository,
     IRepository<Tag> tagRepository,
-    IRepository<ImageTag> imageTagRepository) : IImageService
+    IRepository<ImageTag> imageTagRepository,
+    IRepository<Category> categoryRepository) : IImageService
 {
     public async Task<Result<ImageSearchResponse>> SearchAsync(ImageSearchRequest request)
     {
@@ -28,7 +29,7 @@ public class ImageService(
             var options = new SearchOptions<Image>
             {
                 Query = predicate,
-                Include = query => query.Include(i => i.ImageTags).ThenInclude(it => it.Tag),
+                Include = query => query.Include(i => i.ImageTags).ThenInclude(it => it.Tag).Include(i => i.Category),
                 OrderBy = request.Sort.Equals("oldest", StringComparison.OrdinalIgnoreCase)
                     ? query => query.OrderBy(i => i.DateAdded).ThenBy(i => i.Id)
                     : query => query.OrderByDescending(i => i.DateAdded).ThenByDescending(i => i.Id),
@@ -83,6 +84,7 @@ public class ImageService(
         string fileName,
         string? sourceUrl,
         List<string>? tagNames,
+        int? categoryId,
         bool force,
         CancellationToken cancellationToken = default)
     {
@@ -95,10 +97,22 @@ public class ImageService(
                 $"File type '{extension}' is not allowed. Allowed types: {opts.AllowedExtensions}")]);
         }
 
+        Category? category = null;
+        if (categoryId is int wantedCategoryId)
+        {
+            category = await categoryRepository.FindOneAsync(wantedCategoryId);
+            if (category is null)
+            {
+                return Result.Invalid([new ValidationError("CategoryId", "Category not found")]);
+            }
+        }
+
+        string categoryFolder = fileStorage.GetCategoryFolderName(category?.Id, category?.Name);
+
         StoredImageFile? stored = null;
         try
         {
-            stored = await fileStorage.SaveImageAsync(stream, fileName, cancellationToken);
+            stored = await fileStorage.SaveImageAsync(stream, fileName, categoryFolder, cancellationToken);
 
             if (stored.FileSizeBytes > opts.MaxFileSizeBytes)
             {
@@ -135,7 +149,8 @@ public class ImageService(
                 PerceptualHash = hash,
                 OcrText = ocrText,
                 SourceUrl = sourceUrl,
-                DateAdded = DateTime.UtcNow
+                DateAdded = DateTime.UtcNow,
+                CategoryId = category?.Id
             });
 
             var normalizedTags = NormalizeTagNames(tagNames);
@@ -208,7 +223,7 @@ public class ImageService(
             }
 
             await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
-            return await IngestAsync(stream, fileName, request.PageUrl ?? request.ImageUrl, request.TagNames, force, cancellationToken);
+            return await IngestAsync(stream, fileName, request.PageUrl ?? request.ImageUrl, request.TagNames, request.CategoryId, force, cancellationToken);
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
         {
@@ -295,6 +310,49 @@ public class ImageService(
             }
 
             return Result.Error("An error occurred while updating tags");
+        }
+    }
+
+    public async Task<Result<ImageDetail>> SetCategoryAsync(int id, SetImageCategoryRequest request)
+    {
+        try
+        {
+            var image = await imageRepository.FindOneAsync(id);
+            if (image is null)
+            {
+                return Result.NotFound("Image not found");
+            }
+
+            Category? category = null;
+            if (request.CategoryId is int wantedCategoryId)
+            {
+                category = await categoryRepository.FindOneAsync(wantedCategoryId);
+                if (category is null)
+                {
+                    return Result.Invalid([new ValidationError("CategoryId", "Category not found")]);
+                }
+            }
+
+            string newCategoryFolder = fileStorage.GetCategoryFolderName(category?.Id, category?.Name);
+            var (newStoragePath, newThumbnailPath) = await fileStorage.MoveToCategoryAsync(
+                image.StoragePath, image.ThumbnailPath, newCategoryFolder);
+
+            image.CategoryId = category?.Id;
+            image.StoragePath = newStoragePath;
+            image.ThumbnailPath = newThumbnailPath;
+            await imageRepository.UpdateAsync(image);
+
+            var saved = await FindWithTagsAsync(id);
+            return Result.Success(MapToDetail(saved!));
+        }
+        catch (Exception ex)
+        {
+            if (logger.IsEnabled(LogLevel.Error))
+            {
+                logger.LogError(ex, "Error setting category for image {ImageId}", id);
+            }
+
+            return Result.Error("An error occurred while updating the category");
         }
     }
 
@@ -408,6 +466,11 @@ public class ImageService(
                     .Count() == tagNames.Count);
         }
 
+        if (request.CategoryId is int categoryId)
+        {
+            predicate = predicate.And(i => i.CategoryId == categoryId);
+        }
+
         if (request.UntaggedOnly)
         {
             predicate = predicate.And(i => !i.ImageTags.Any());
@@ -453,7 +516,7 @@ public class ImageService(
         var images = await imageRepository.FindAsync(new SearchOptions<Image>
         {
             Query = i => pageIds.Contains(i.Id),
-            Include = query => query.Include(i => i.ImageTags).ThenInclude(it => it.Tag),
+            Include = query => query.Include(i => i.ImageTags).ThenInclude(it => it.Tag).Include(i => i.Category),
             SplitQuery = true
         });
 
@@ -569,7 +632,7 @@ public class ImageService(
         await imageRepository.FindOneAsync(new SearchOptions<Image>
         {
             Query = x => x.Id == id,
-            Include = query => query.Include(i => i.ImageTags).ThenInclude(it => it.Tag)
+            Include = query => query.Include(i => i.ImageTags).ThenInclude(it => it.Tag).Include(i => i.Category)
         });
 
     internal static List<string> NormalizeTagNames(List<string>? tagNames) =>
@@ -592,7 +655,9 @@ public class ImageService(
         image.Width,
         image.Height,
         image.DateAdded,
-        GetTagNames(image));
+        GetTagNames(image),
+        image.CategoryId,
+        image.Category?.Name);
 
     private static ImageDetail MapToDetail(Image image) => new(
         image.Id,
@@ -607,5 +672,7 @@ public class ImageService(
         image.OcrText,
         image.SourceUrl,
         image.DateAdded,
-        GetTagNames(image));
+        GetTagNames(image),
+        image.CategoryId,
+        image.Category?.Name);
 }
