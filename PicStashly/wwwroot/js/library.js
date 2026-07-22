@@ -231,8 +231,11 @@ class LibraryViewModel {
     };
 
     openLightbox = (image) => {
+        this._destroyLightboxTagify();
         this.lightboxImage(image);
         document.body.style.overflow = 'hidden';
+        // Knockout's `with` binding creates the toolbar DOM synchronously on the
+        // assignment above, but defer one tick so layout has settled.
         setTimeout(() => this._initLightboxTags(image), 0);
     };
 
@@ -243,10 +246,15 @@ class LibraryViewModel {
     };
 
     _focusLightboxTagsInput = () => {
-        document.querySelector('#lightboxTagsInput')?.closest('.tagify')?.querySelector('.tagify__input')?.focus();
+        // Prefer Tagify's contenteditable; fall back to the raw input if Tagify isn't ready yet.
+        const tagInput = this._lightboxTagify?.DOM?.input
+            ?? document.querySelector('.lightbox-toolbar .tagify__input')
+            ?? document.getElementById('lightboxTagsInput');
+        tagInput?.focus();
     };
 
     closeLightbox = () => {
+        this._destroyLightboxTagify();
         this.lightboxImage(null);
         document.body.style.overflow = '';
     };
@@ -263,6 +271,8 @@ class LibraryViewModel {
         const index = items.findIndex(i => i.id === current.id);
         const next = items[index + direction];
         if (next) {
+            // Destroy before Knockout recreates the toolbar via `with: lightboxImage`.
+            this._destroyLightboxTagify();
             this.lightboxImage(next);
             this._initLightboxTags(next);
 
@@ -274,20 +284,31 @@ class LibraryViewModel {
         }
     };
 
+    // Knockout's `with: lightboxImage` recreates the toolbar DOM whenever the image
+    // changes or the lightbox closes, so Tagify must be rebuilt against the new input.
+    _destroyLightboxTagify = () => {
+        if (!this._lightboxTagify) return;
+        try {
+            this._lightboxTagify.destroy();
+        } catch {
+            // DOM may already have been removed by Knockout.
+        }
+        this._lightboxTagify = null;
+    };
+
     _initLightboxTags = (image) => {
         const input = document.getElementById('lightboxTagsInput');
         if (!input) return;
 
-        if (!this._lightboxTagify) {
-            this._lightboxTagify = new Tagify(input, getTagifyOptions(this._tagWhitelist));
-            this._lightboxTagify.on('change', () => {
-                if (this._suppressLightboxTagEvents) return;
-                this._saveLightboxTags();
-            });
-        }
+        this._destroyLightboxTagify();
+
+        this._lightboxTagify = new Tagify(input, getTagifyOptions(this._tagWhitelist));
+        this._lightboxTagify.on('change', () => {
+            if (this._suppressLightboxTagEvents) return;
+            this._saveLightboxTags();
+        });
 
         this._suppressLightboxTagEvents = true;
-        this._lightboxTagify.removeAllTags();
         this._lightboxTagify.addTags(image.tags || []);
         this._suppressLightboxTagEvents = false;
     };
@@ -404,30 +425,37 @@ class LibraryViewModel {
         }
     };
 
+    _isEditableKeyTarget = (el) => {
+        if (!el || !el.tagName) return false;
+        const tag = el.tagName;
+        if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return true;
+        if (el.isContentEditable) return true;
+        return !!(el.closest && (el.closest('.tagify') || el.closest('.tagify__dropdown')));
+    };
+
     _initKeyboard = () => {
         document.addEventListener('keydown', (e) => {
             if (!this.lightboxImage()) return;
 
-            // Don't steal keys while typing in the tag input.
-            const inTagInput = e.target.closest && e.target.closest('.tagify');
+            // Don't steal keys while typing in Tagify, a plain input, or the category select.
+            if (this._isEditableKeyTarget(e.target)) {
+                if (e.key === 'Escape') {
+                    e.target.blur?.();
+                }
+                return;
+            }
 
             if (e.key === 'Escape') {
-                if (inTagInput) {
-                    e.target.blur();
-                } else {
-                    this.closeLightbox();
-                }
-            } else if (!inTagInput) {
-                if (e.key === 'ArrowLeft') {
-                    this.lightboxPrev();
-                } else if (e.key === 'ArrowRight') {
-                    this.lightboxNext();
-                } else if (e.key === 't') {
-                    e.preventDefault();
-                    this._focusLightboxTagsInput();
-                } else if (e.key === 'Delete') {
-                    this.deleteLightboxImage();
-                }
+                this.closeLightbox();
+            } else if (e.key === 'ArrowLeft') {
+                this.lightboxPrev();
+            } else if (e.key === 'ArrowRight') {
+                this.lightboxNext();
+            } else if (e.key === 't' || e.key === 'T') {
+                e.preventDefault();
+                this._focusLightboxTagsInput();
+            } else if (e.key === 'Delete') {
+                this.deleteLightboxImage();
             }
         });
     };
