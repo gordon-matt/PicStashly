@@ -28,6 +28,20 @@
                 <div class="alert alert-success py-2">
                     <i class="bi bi-check-circle me-1"></i> Saved!
                 </div>
+
+                <div class="mb-3">
+                    <label class="form-label fw-semibold d-flex justify-content-between align-items-center">
+                        Extracted text (OCR)
+                        <button type="button" class="btn btn-sm btn-outline-primary"
+                                data-bind="click: saveOcrText, enable: ocrTextDirty">
+                            <i class="bi bi-save"></i> Save
+                        </button>
+                    </label>
+                    <textarea class="form-control" rows="4"
+                              placeholder="No text extracted — correct or add it here to make the image searchable"
+                              data-bind="value: ocrText, valueUpdate: 'afterkeydown'"></textarea>
+                </div>
+
                 <a class="btn btn-outline-primary" data-bind="attr: { href: '/image/' + savedId() }">View image</a>
             </div>
 

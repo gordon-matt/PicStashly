@@ -13,6 +13,9 @@ class UploadQueueItem {
         this.errorMessage = ko.observable('');
         this.duplicates = ko.observableArray([]);
         this.savedImage = null;
+        this.ocrText = ko.observable('');
+        this.savedOcrText = ko.observable('');
+        this.ocrTextDirty = ko.computed(() => this.ocrText() !== this.savedOcrText());
         this._tagify = null;
     }
 }
@@ -135,6 +138,8 @@ class UploadViewModel {
             }
 
             item.savedImage = data.image;
+            item.ocrText(data.image.ocrText || '');
+            item.savedOcrText(data.image.ocrText || '');
             item.status('saved');
             setTimeout(() => this._initPerImageTags(item), 0);
         } catch (error) {
@@ -173,6 +178,29 @@ class UploadViewModel {
                 suppress = false;
             }
         });
+    };
+
+    saveOcrText = async (item) => {
+        if (!item.savedImage) return;
+
+        try {
+            const response = await fetch(`/api/images/${item.savedImage.id}/ocr`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ocrText: item.ocrText() })
+            });
+
+            if (response.ok) {
+                item.savedOcrText(item.ocrText());
+                item.savedImage.ocrText = item.ocrText() || null;
+                toast.success('Text updated.');
+            } else {
+                toast.error('Failed to update text.');
+            }
+        } catch (error) {
+            console.error('Error saving OCR text:', error);
+            toast.error('Failed to update text.');
+        }
     };
 
     saveAnyway = (item) => this._uploadItem(item, true);

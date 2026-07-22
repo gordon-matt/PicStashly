@@ -15,7 +15,19 @@
             <img class="detail-image" data-bind="attr: { src: url, alt: fileName }" />
         </div>
         <div class="col-12 col-lg-4">
-            <h4 class="text-break" data-bind="text: fileName"></h4>
+            <div class="mb-3">
+                <label class="form-label fw-semibold d-flex justify-content-between align-items-center">
+                    File name
+                    <button class="btn btn-sm btn-outline-primary" data-bind="click: $parent.saveFileName, enable: $parent.fileNameDirty">
+                        <i class="bi bi-save"></i> Save
+                    </button>
+                </label>
+                <div class="input-group">
+                    <input type="text" class="form-control" maxlength="512"
+                           data-bind="value: $parent.fileNameBase, valueUpdate: 'afterkeydown'" />
+                    <span class="input-group-text" data-bind="text: $parent.fileExtension"></span>
+                </div>
+            </div>
 
             <div class="mb-3">
                 <label class="form-label fw-semibold">Tags</label>

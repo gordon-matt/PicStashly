@@ -30,6 +30,21 @@ export function formatNumber(num) {
 }
 
 /**
+ * Splits a file name into its editable base and its extension (including the leading dot,
+ * or '' if there isn't one). Used to keep the extension out of rename inputs so users can't
+ * accidentally strip it.
+ */
+export function splitFileName(fileName) {
+    const name = fileName || '';
+    const dotIndex = name.lastIndexOf('.');
+    // A leading dot (dotfile) or no dot at all means there's no extension to split off.
+    if (dotIndex <= 0) {
+        return { base: name, extension: '' };
+    }
+    return { base: name.slice(0, dotIndex), extension: name.slice(dotIndex) };
+}
+
+/**
  * Copies the image at `url` to the OS clipboard so it can be pasted directly into social
  * media / chat apps. Browsers only reliably support "image/png" clipboard writes (jpg/webp
  * are inconsistent or unsupported), so the source is always re-encoded through a canvas.

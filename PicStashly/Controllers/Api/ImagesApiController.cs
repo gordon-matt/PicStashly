@@ -64,6 +64,9 @@ public class ImagesApiController : ControllerBase
     [HttpPut("{id:int}/ocr")]
     public Task<Result> UpdateOcrText(int id, [FromBody] UpdateOcrTextRequest request) => imageService.UpdateOcrTextAsync(id, request);
 
+    [HttpPut("{id:int}/filename")]
+    public Task<Result<ImageDetail>> Rename(int id, [FromBody] RenameImageRequest request) => imageService.RenameAsync(id, request);
+
     [HttpPost("bulk-tags")]
     public Task<Result> BulkTag([FromBody] BulkTagRequest request) => imageService.BulkTagAsync(request);
 }

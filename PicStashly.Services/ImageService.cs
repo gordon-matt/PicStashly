@@ -390,6 +390,54 @@ public class ImageService(
         }
     }
 
+    public async Task<Result<ImageDetail>> RenameAsync(int id, RenameImageRequest request)
+    {
+        try
+        {
+            var image = await FindWithTagsAsync(id);
+            if (image is null)
+            {
+                return Result.NotFound("Image not found");
+            }
+
+            // Strip any path segments the client may have pasted; FileName is display-only.
+            string name = Path.GetFileName(request.FileName?.Trim() ?? string.Empty);
+            if (string.IsNullOrWhiteSpace(name))
+            {
+                return Result.Invalid([new ValidationError(nameof(request.FileName), "File name is required.")]);
+            }
+
+            if (name.Length > 512)
+            {
+                return Result.Invalid([new ValidationError(nameof(request.FileName), "File name must be 512 characters or fewer.")]);
+            }
+
+            // Keep the original extension when the user renames without one (helps downloads).
+            if (string.IsNullOrEmpty(Path.GetExtension(name)))
+            {
+                string existingExt = Path.GetExtension(image.FileName);
+                if (!string.IsNullOrEmpty(existingExt))
+                {
+                    name += existingExt;
+                }
+            }
+
+            image.FileName = name;
+            await imageRepository.UpdateAsync(image);
+
+            return Result.Success(MapToDetail(image));
+        }
+        catch (Exception ex)
+        {
+            if (logger.IsEnabled(LogLevel.Error))
+            {
+                logger.LogError(ex, "Error renaming image {ImageId}", id);
+            }
+
+            return Result.Error("An error occurred while renaming the image");
+        }
+    }
+
     public async Task<Result> BulkTagAsync(BulkTagRequest request)
     {
         try

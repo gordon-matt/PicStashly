@@ -32,5 +32,11 @@ public interface IImageService
 
     Task<Result> UpdateOcrTextAsync(int id, UpdateOcrTextRequest request);
 
+    /// <summary>
+    /// Updates the display/download file name only — storage paths are unchanged
+    /// (disk files use a date-based name independent of the original upload name).
+    /// </summary>
+    Task<Result<ImageDetail>> RenameAsync(int id, RenameImageRequest request);
+
     Task<Result> BulkTagAsync(BulkTagRequest request);
 }

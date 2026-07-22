@@ -1,4 +1,4 @@
-import { formatDateTime, formatFileSize, copyImageToClipboard } from './utils.js';
+import { formatDateTime, formatFileSize, copyImageToClipboard, splitFileName } from './utils.js';
 import { getTagifyOptions, loadTagWhitelist } from './tagify-options.js';
 import { loadCategories } from './categories-shared.js';
 
@@ -9,10 +9,16 @@ class ImageDetailsViewModel {
         this.loading = ko.observable(true);
         this.ocrText = ko.observable('');
         this.savedOcrText = ko.observable('');
+        // The extension is kept out of the editable field entirely so renaming can't
+        // accidentally drop it — it's shown alongside as a fixed suffix instead.
+        this.fileNameBase = ko.observable('');
+        this.savedFileNameBase = ko.observable('');
+        this.fileExtension = ko.observable('');
         this.categoryId = ko.observable(null);
         this.categories = ko.observableArray([]);
 
         this.ocrTextDirty = ko.computed(() => this.ocrText() !== this.savedOcrText());
+        this.fileNameDirty = ko.computed(() => this.fileNameBase() !== this.savedFileNameBase());
 
         this.formatDateTime = formatDateTime;
         this.formatFileSize = formatFileSize;
@@ -37,6 +43,10 @@ class ImageDetailsViewModel {
             this.image(data);
             this.ocrText(data.ocrText || '');
             this.savedOcrText(data.ocrText || '');
+            const { base, extension } = splitFileName(data.fileName || '');
+            this.fileNameBase(base);
+            this.savedFileNameBase(base);
+            this.fileExtension(extension);
             this.categoryId(data.categoryId ?? null);
 
             await this._initTags(data);
@@ -107,6 +117,38 @@ class ImageDetailsViewModel {
         } catch (error) {
             console.error('Error copying image:', error);
             toast.error(error.message || 'Failed to copy image.');
+        }
+    };
+
+    saveFileName = async () => {
+        const base = (this.fileNameBase() || '').trim();
+        if (!base) {
+            toast.error('File name is required.');
+            return;
+        }
+
+        try {
+            const response = await fetch(`/api/images/${this.imageId}/filename`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ fileName: base + this.fileExtension() })
+            });
+
+            const data = await response.json().catch(() => ({}));
+
+            if (response.ok) {
+                this.image(data);
+                const { base: newBase, extension } = splitFileName(data.fileName || '');
+                this.fileNameBase(newBase);
+                this.savedFileNameBase(newBase);
+                this.fileExtension(extension);
+                toast.success('File name updated.');
+            } else {
+                toast.error(data.message || 'Failed to rename image.');
+            }
+        } catch (error) {
+            console.error('Error renaming image:', error);
+            toast.error('Failed to rename image.');
         }
     };
 

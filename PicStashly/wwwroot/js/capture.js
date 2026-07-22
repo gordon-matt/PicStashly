@@ -8,6 +8,9 @@ class CaptureViewModel {
         this.savedId = ko.observable(null);
         this.duplicates = ko.observableArray([]);
         this.errorMessage = ko.observable('');
+        this.ocrText = ko.observable('');
+        this.savedOcrText = ko.observable('');
+        this.ocrTextDirty = ko.computed(() => this.ocrText() !== this.savedOcrText());
 
         this._tagify = null;
     }
@@ -48,12 +51,37 @@ class CaptureViewModel {
                 this.status('duplicate');
             } else {
                 this.savedId(data.image.id);
+                this.ocrText(data.image.ocrText || '');
+                this.savedOcrText(data.image.ocrText || '');
                 this.status('saved');
             }
         } catch (error) {
             console.error('Capture failed:', error);
             this.errorMessage('Capture failed.');
             this.status('error');
+        }
+    };
+
+    saveOcrText = async () => {
+        const id = this.savedId();
+        if (!id) return;
+
+        try {
+            const response = await fetch(`/api/images/${id}/ocr`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ocrText: this.ocrText() })
+            });
+
+            if (response.ok) {
+                this.savedOcrText(this.ocrText());
+                toast.success('Text updated.');
+            } else {
+                toast.error('Failed to update text.');
+            }
+        } catch (error) {
+            console.error('Error saving OCR text:', error);
+            toast.error('Failed to update text.');
         }
     };
 }
