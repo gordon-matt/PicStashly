@@ -2,22 +2,20 @@
 # .NET 10 Linux images: Ubuntu Noble (10.0-noble) only — Debian is not supported in .NET 10.
 
 # Base stage: used directly by Visual Studio (F5 / fast mode debug).
-# tesseract-ocr is installed here so image text extraction works out of the box.
+# OCR is done in-process by PaddleOCR (Sdcb.PaddleOCR) with bundled models — no CLI to install.
+# Its native libraries (paddle_inference + OpenCvSharpExtern) need the OpenMP runtime (libgomp1);
+# libglib2.0-0 covers OpenCvSharpExtern's remaining runtime dependency.
 FROM mcr.microsoft.com/dotnet/aspnet:10.0-noble AS base
-# tesseract-ocr-eng is listed explicitly (not just pulled in as a recommends) so English OCR
-# works even on minimal base images where --no-install-recommends would otherwise drop it.
 RUN apt-get update \
-  && apt-get install -y --no-install-recommends tesseract-ocr tesseract-ocr-eng \
+  && apt-get install -y --no-install-recommends libgomp1 libglib2.0-0 \
   && rm -rf /var/lib/apt/lists/*
-# Verify tesseract is present, runnable, and can actually find the eng language data —
-# build fails here if something went wrong, instead of silently shipping a broken OCR setup.
-RUN tesseract --version | head -n1 && tesseract --list-langs | grep -qx eng
 WORKDIR /app
 EXPOSE 8080
 EXPOSE 8081
 
-# Build stage
-FROM mcr.microsoft.com/dotnet/sdk:10.0-alpine AS build
+# Build stage — use the glibc (Noble) SDK, not Alpine: the PaddleOCR/OpenCvSharp native runtime
+# packages restored here are glibc builds (linux-x64), matching the Noble runtime image above.
+FROM mcr.microsoft.com/dotnet/sdk:10.0-noble AS build
 ARG BUILD_CONFIGURATION=Release
 WORKDIR /src
 # Copy every csproj the web app references so `dotnet restore` can resolve the full
@@ -50,7 +48,7 @@ RUN cp -r /src/PicStashly/wwwroot/lib /app/publish/wwwroot/
 # Scoped CSS (Razor) may be at publish root; copy to wwwroot so UseStaticFiles can serve it
 RUN if [ -f /app/publish/PicStashly.styles.css ]; then cp /app/publish/PicStashly.styles.css /app/publish/wwwroot/; fi
 
-# Final stage: inherits tesseract from base (Ubuntu Noble).
+# Final stage: inherits the OCR native runtime deps from base (Ubuntu Noble).
 # Used by both docker compose and Visual Studio in regular (non-fast) mode.
 FROM base AS final
 COPY --from=publish /app/publish .

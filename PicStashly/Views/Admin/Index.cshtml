@@ -44,17 +44,18 @@
     <!-- OCR availability -->
     <div data-bind="visible: stats() && !stats().ocrAvailable" class="alert alert-warning" style="display: none;">
         <i class="bi bi-exclamation-triangle me-1"></i>
-        <strong>OCR is unavailable</strong> — the <code>tesseract</code> CLI wasn't found, so text
-        extraction is being skipped for every upload. If you just installed it:
+        <strong>OCR is unavailable</strong> — PaddleOCR's native stack failed to load, so text
+        extraction is being skipped for every upload. Models are bundled with the app, so this is
+        almost always a missing system dependency:
         <ul class="mb-2">
-            <li>Restart the app — a process already running keeps the PATH it started with, so
-                adding tesseract to PATH afterwards has no effect until it's restarted.</li>
-            <li>If <code>Ocr:TesseractPath</code> is set in <code>appsettings.json</code>, it must
-                point at the executable (or its folder) — e.g.
-                <code>C:\Program Files\Tesseract-OCR\tesseract.exe</code> — not some other path.</li>
+            <li><strong>Windows:</strong> install the latest
+                <a href="https://aka.ms/vs/17/release/vc_redist.x64.exe" target="_blank" rel="noopener">Visual C++ Redistributable (x64)</a>,
+                then restart the app.</li>
+            <li><strong>Linux/Docker:</strong> ensure <code>libgomp1</code> is installed (it's already
+                added in this app's Docker image).</li>
+            <li>If your CPU is old and lacks AVX, set <code>Ocr:Device</code> to <code>Openblas</code>
+                in <code>appsettings.json</code>.</li>
         </ul>
-        Otherwise, install it: <code>winget install tesseract-ocr.tesseract</code> (Windows) or
-        <code>apt install tesseract-ocr</code> (Linux/Docker — already bundled in this app's Docker image).
         Once it's working, use <strong>Re-run OCR on all images</strong> below to backfill existing uploads.
     </div>
 

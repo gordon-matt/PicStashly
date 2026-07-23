@@ -18,8 +18,9 @@ Think of it as a personal visual search engine, not a photo manager.
   tags and OCR text, tag and category filters, "untagged only" toggle, and random shuffle.
 - **Dedup on ingest**: a 64-bit perceptual hash (dHash) is computed for every image; near-duplicates
   are flagged on upload with a "view existing / save anyway / merge tags" prompt.
-- **OCR**: meme captions are extracted with [tesseract](https://github.com/tesseract-ocr/tesseract)
-  (when installed) and become searchable. Text is editable/correctable per image.
+- **OCR**: meme captions are extracted with [PaddleOCR](https://github.com/PaddlePaddle/PaddleOCR)
+  (PP-OCRv5, in-process via [Sdcb.PaddleOCR](https://github.com/sdcb/PaddleSharp)) and become
+  searchable. Models are bundled — nothing to install. Text is editable/correctable per image.
 - **Automatic downscaling**: images larger than the configured maximum are resized on upload
   (aspect ratio preserved, original format kept); WebP thumbnails are generated for the grid.
 - **Lightbox** with keyboard navigation: `←`/`→` prev/next, `t` focus tags, `Esc` close, `Del` delete.
@@ -86,12 +87,20 @@ upload, and tag.
 | `Upload` | `MaxFileSizeBytes` | 50 MB | Per-file upload limit |
 | `Upload` | `DuplicateHammingThreshold` | `5` | pHash distance considered a near-duplicate (0–64) |
 | `Ocr` | `Enabled` | `true` | Extract text from images on ingest |
-| `Ocr` | `TesseractPath` | `tesseract` | Path to the tesseract CLI |
-| `Ocr` | `Languages` | `eng` | Tesseract language(s), e.g. `eng+deu` |
+| `Ocr` | `Device` | `Mkldnn` | Inference backend: `Mkldnn` or `Openblas` (see note) |
+| `Ocr` | `DetectionMaxSize` | `960` | Long-side cap (px) for text detection; `0` disables it |
+| `Ocr` | `AllowRotateDetection` | `false` | Detect angled text (keep off for upright captions) |
+| `Ocr` | `Enable180Classification` | `false` | Detect text rotated 180° |
 
-OCR requires the tesseract CLI (`winget install tesseract-ocr.tesseract` on Windows,
-`apt install tesseract-ocr` on Debian/Ubuntu). When it's not installed, OCR is skipped
-gracefully and everything else works normally. The Docker image includes it.
+OCR runs in-process via PaddleOCR with bundled PP-OCRv5 models — no CLI or model download required.
+Its native libraries need the Visual C++ Redistributable on Windows, or `libgomp1` on Linux
+(included in the Docker image). If the native stack can't load, OCR is skipped gracefully and
+everything else works normally. On old CPUs without AVX, set `Ocr:Device` to `Openblas`.
+
+> The `DetectionMaxSize` cap (960 px long side) is what keeps memory bounded — it's the same
+> mitigation as PaddleOCR issue #17955, applied here by default, so the 3.x CPU memory blow-up
+> doesn't occur. An `Onnx` backend also exists but can't convert the bundled PP-OCRv5 detection
+> model (Paddle2ONNX limitation), so it's not used.
 
 ## Running
 

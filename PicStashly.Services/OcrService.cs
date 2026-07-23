@@ -1,59 +1,74 @@
-using System.Diagnostics;
 using Microsoft.Extensions.Options;
+using OpenCvSharp;
+using Sdcb.PaddleInference;
+using Sdcb.PaddleOCR;
+using Sdcb.PaddleOCR.Models;
+using Sdcb.PaddleOCR.Models.Local;
+using SixLabors.ImageSharp.Formats.Png;
+using ImageSharpImage = SixLabors.ImageSharp.Image;
+using LogLevel = Microsoft.Extensions.Logging.LogLevel;
 
 namespace PicStashly.Services;
 
 /// <summary>
-/// Extracts text from images by shelling out to the tesseract CLI. Chosen over native bindings
-/// because it works identically on Windows and Linux with a plain <c>tesseract</c> install and
-/// has no native-library versioning headaches. Degrades gracefully when tesseract is missing.
+/// Extracts text from images using PaddleOCR (PP-OCRv5) via the Sdcb.PaddleOCR wrapper. Runs fully
+/// in-process — no external CLI — using bundled local models, so it works offline and in Docker with
+/// no model download at runtime. Replaced the previous tesseract CLI integration, which struggled
+/// with meme/screenshot text. Degrades gracefully (returns null) when the native stack can't load.
 /// </summary>
-public class OcrService(IOptions<OcrOptions> ocrOptions, ILogger<OcrService> logger) : IOcrService
+public sealed class OcrService : IOcrService, IDisposable
 {
-    private bool? isTesseractAvailable;
-    private string? resolvedExecutablePath;
+    private readonly OcrOptions options;
+    private readonly ILogger<OcrService> logger;
+
+    // The queued engine is thread-safe and expensive to build (loads native libs + model), so it's
+    // created once, lazily, and shared. A null engine after init means the native stack failed to load.
+    private readonly object initLock = new();
+    private bool initialized;
+    private QueuedPaddleOcrAll? engine;
+
+    public OcrService(IOptions<OcrOptions> ocrOptions, ILogger<OcrService> logger)
+    {
+        options = ocrOptions.Value;
+        this.logger = logger;
+    }
 
     public async Task<string?> ExtractTextAsync(string fullPath, CancellationToken cancellationToken = default)
     {
-        var opts = ocrOptions.Value;
+        if (!options.Enabled)
+        {
+            return null;
+        }
 
-        if (!opts.Enabled || !await IsAvailableAsync(cancellationToken))
+        var ocr = EnsureEngine();
+        if (ocr is null)
         {
             return null;
         }
 
         try
         {
-            using var process = new Process
+            // Re-encode through ImageSharp to PNG bytes first: it handles every format we ingest
+            // (incl. webp/gif) consistently, sidestepping gaps in OpenCV's built-in image codecs.
+            byte[] pngBytes;
+            using (var image = await ImageSharpImage.LoadAsync(fullPath, cancellationToken))
+            using (var buffer = new MemoryStream())
             {
-                StartInfo = new ProcessStartInfo
-                {
-                    FileName = resolvedExecutablePath,
-                    ArgumentList = { fullPath, "stdout", "-l", opts.Languages },
-                    RedirectStandardOutput = true,
-                    RedirectStandardError = true,
-                    UseShellExecute = false,
-                    CreateNoWindow = true
-                }
-            };
+                await image.SaveAsync(buffer, new PngEncoder(), cancellationToken);
+                pngBytes = buffer.ToArray();
+            }
 
-            process.Start();
-
-            using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-            timeoutCts.CancelAfter(TimeSpan.FromSeconds(opts.TimeoutSeconds));
-
-            string output = await process.StandardOutput.ReadToEndAsync(timeoutCts.Token);
-            await process.WaitForExitAsync(timeoutCts.Token);
-
-            if (process.ExitCode != 0)
+            using Mat src = Cv2.ImDecode(pngBytes, ImreadModes.Color);
+            if (src.Empty())
             {
                 return null;
             }
 
-            string text = output.Trim();
+            PaddleOcrResult result = await ocr.Run(src);
+            string text = result.Text?.Trim() ?? string.Empty;
             return string.IsNullOrWhiteSpace(text) ? null : text;
         }
-        catch (Exception ex) when (ex is not OperationCanceledException || cancellationToken.IsCancellationRequested == false)
+        catch (Exception ex) when (ex is not OperationCanceledException || !cancellationToken.IsCancellationRequested)
         {
             if (logger.IsEnabled(LogLevel.Warning))
             {
@@ -64,82 +79,71 @@ public class OcrService(IOptions<OcrOptions> ocrOptions, ILogger<OcrService> log
         }
     }
 
-    public async Task<bool> IsAvailableAsync(CancellationToken cancellationToken = default)
+    public Task<bool> IsAvailableAsync(CancellationToken cancellationToken = default) =>
+        Task.FromResult(options.Enabled && EnsureEngine() is not null);
+
+    private QueuedPaddleOcrAll? EnsureEngine()
     {
-        if (isTesseractAvailable.HasValue)
+        if (initialized)
         {
-            return isTesseractAvailable.Value;
+            return engine;
         }
 
-        resolvedExecutablePath = ResolveExecutablePath(ocrOptions.Value.TesseractPath);
-
-        try
+        lock (initLock)
         {
-            using var process = new Process
+            if (initialized)
             {
-                StartInfo = new ProcessStartInfo
-                {
-                    FileName = resolvedExecutablePath,
-                    ArgumentList = { "--version" },
-                    RedirectStandardOutput = true,
-                    RedirectStandardError = true,
-                    UseShellExecute = false,
-                    CreateNoWindow = true
-                }
-            };
-
-            process.Start();
-            await process.WaitForExitAsync(cancellationToken);
-            isTesseractAvailable = process.ExitCode == 0;
-        }
-        catch (Exception ex)
-        {
-            isTesseractAvailable = false;
-
-            if (logger.IsEnabled(LogLevel.Warning))
-            {
-                logger.LogWarning(
-                    ex,
-                    "Tesseract not found at '{Path}' (resolved to '{ResolvedPath}'). OCR is skipped — " +
-                    "install tesseract, or set Ocr:TesseractPath to the tesseract executable itself " +
-                    "(not just its folder). Restart the app after changing PATH — running processes " +
-                    "don't pick up PATH changes made after they started.",
-                    ocrOptions.Value.TesseractPath,
-                    resolvedExecutablePath);
+                return engine;
             }
 
-            return false;
-        }
+            try
+            {
+                engine = BuildEngine();
+            }
+            catch (Exception ex)
+            {
+                engine = null;
 
-        if (isTesseractAvailable == false && logger.IsEnabled(LogLevel.Warning))
-        {
-            logger.LogWarning(
-                "Tesseract at '{ResolvedPath}' exited with a non-zero code on --version. OCR is skipped.",
-                resolvedExecutablePath);
-        }
+                if (logger.IsEnabled(LogLevel.Error))
+                {
+                    logger.LogError(ex,
+                        "Failed to initialise PaddleOCR. Text extraction will be skipped. This usually " +
+                        "means a native dependency couldn't load (e.g. missing Visual C++ Redistributable " +
+                        "on Windows, or libgomp1 on Linux).");
+                }
+            }
 
-        return isTesseractAvailable.Value;
+            initialized = true;
+            return engine;
+        }
     }
 
-    /// <summary>
-    /// Accepts either a bare command ("tesseract", resolved via PATH), a full path to the
-    /// executable, or — the easy mistake — the install *folder* (e.g. what you'd copy from
-    /// "where tesseract" minus the filename, or the default Windows install directory). In the
-    /// last case, appends the platform-appropriate executable name so it still works.
-    /// </summary>
-    private static string ResolveExecutablePath(string configuredPath)
+    private QueuedPaddleOcrAll BuildEngine()
     {
-        if (string.IsNullOrWhiteSpace(configuredPath))
-        {
-            return "tesseract";
-        }
+        FullOcrModel model = LocalFullModels.ChineseV5; // PP-OCRv5 multilingual (incl. English)
+        Action<PaddleConfig> device = ResolveDevice(options.Device);
+        int? maxSize = options.DetectionMaxSize > 0 ? options.DetectionMaxSize : null;
 
-        if (!Directory.Exists(configuredPath))
-        {
-            return configuredPath;
-        }
-
-        string exeName = OperatingSystem.IsWindows() ? "tesseract.exe" : "tesseract";
-        return Path.Combine(configuredPath, exeName);
+        return new QueuedPaddleOcrAll(
+            () =>
+            {
+                var all = new PaddleOcrAll(model, device)
+                {
+                    AllowRotateDetection = options.AllowRotateDetection,
+                    Enable180Classification = options.Enable180Classification,
+                };
+                all.Detector.MaxSize = maxSize;
+                return all;
+            },
+            consumerCount: 1);
     }
+
+    private static Action<PaddleConfig> ResolveDevice(string device) => device?.Trim().ToLowerInvariant() switch
+    {
+        "mkldnn" => PaddleDevice.Mkldnn(),
+        "openblas" or "blas" => PaddleDevice.Blas(),
+        _ => PaddleDevice.Onnx(),
+    };
+
+    public void Dispose() => engine?.Dispose();
 }
