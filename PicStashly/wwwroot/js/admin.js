@@ -86,6 +86,10 @@ class AdminViewModel {
         // Written readably here, then minified to one line before it's used as the href —
         // real bookmarklets get stored/copied as raw text, so newlines aren't safe to keep.
         //
+        // IMPORTANT: never use "#" inside the bookmarklet source (e.g. in CSS colors). Browsers
+        // treat "#" as starting the URL fragment and will truncate the javascript: href, which
+        // silently breaks the whole bookmarklet. Use rgb()/rgba() instead.
+        //
         // Many sites lazy-load or serve responsive images, where <img src>/currentSrc points at
         // a tiny placeholder or a low-res srcset candidate rather than the real picture. That
         // still looks fine on the page (the browser scales it up) but is often too small/blurry
@@ -94,13 +98,36 @@ class AdminViewModel {
         // "data:" placeholder URLs it finds along the way. It also supports CSS background-image
         // elements for sites that don't use a plain <img>.
         const source = `(function(){
-            if (document.images.length === 0) {
-                alert('No images found on this page.');
+            var origin = '${origin}';
+            var prevCursor = document.body.style.cursor;
+            var lastEl = null;
+            var overlay = null;
+            var toast = null;
+
+            function showToast(msg, ms) {
+                if (toast) toast.remove();
+                toast = document.createElement('div');
+                toast.textContent = msg;
+                toast.style.cssText = 'position:fixed;top:20px;left:50%;transform:translateX(-50%);' +
+                    'background:rgb(220,38,38);color:rgb(255,255,255);padding:14px 22px;border-radius:8px;' +
+                    'font:bold 16px/1.4 system-ui,sans-serif;z-index:2147483647;pointer-events:none;' +
+                    'box-shadow:0 6px 24px rgba(0,0,0,0.45);border:2px solid rgb(255,255,255)';
+                document.documentElement.appendChild(toast);
+                setTimeout(function () {
+                    if (toast) { toast.remove(); toast = null; }
+                }, ms || 3000);
+            }
+
+            if (!document.images.length) {
+                showToast('No images found on this page.');
                 return;
             }
 
-            var origin = '${origin}';
-            var prev = document.body.style.cursor;
+            overlay = document.createElement('div');
+            overlay.style.cssText = 'position:fixed;display:none;pointer-events:none;z-index:2147483646;' +
+                'box-sizing:border-box;border:3px solid rgb(59,130,246);border-radius:4px;' +
+                'box-shadow:0 0 0 2px rgba(59,130,246,0.4)';
+            document.documentElement.appendChild(overlay);
             document.body.style.cursor = 'crosshair';
 
             function pickLargestFromSrcset(srcset) {
@@ -130,7 +157,6 @@ class AdminViewModel {
                     var v = el.getAttribute(lazyAttrs[i]);
                     if (!isPlaceholder(v)) return v;
                 }
-
                 var srcsetAttrs = ['data-srcset', 'srcset'];
                 for (var j = 0; j < srcsetAttrs.length; j++) {
                     var ss = el.getAttribute(srcsetAttrs[j]);
@@ -139,7 +165,6 @@ class AdminViewModel {
                         if (!isPlaceholder(best)) return best;
                     }
                 }
-
                 if (!isPlaceholder(el.currentSrc)) return el.currentSrc;
                 if (!isPlaceholder(el.src)) return el.src;
                 return el.currentSrc || el.src || null;
@@ -151,28 +176,92 @@ class AdminViewModel {
                 return match ? match[1] : null;
             }
 
-            function handleClick(e) {
-                var target = e.target;
+            function findPickable(x, y) {
+                var els = document.elementsFromPoint(x, y);
+                for (var i = 0; i < els.length; i++) {
+                    var el = els[i];
+                    if (el === overlay || el === toast) continue;
+                    if (el.tagName === 'IMG') return el;
+                    if (el.tagName === 'PICTURE') {
+                        var img = el.querySelector('img');
+                        if (img) return img;
+                    }
+                    if (resolveBackgroundUrl(el)) return el;
+                }
+                return null;
+            }
+
+            function clearHighlight() {
+                lastEl = null;
+                if (overlay) overlay.style.display = 'none';
+            }
+
+            function updateOverlay(el) {
+                var r = el.getBoundingClientRect();
+                if (r.width < 2 || r.height < 2) { clearHighlight(); return; }
+                overlay.style.display = 'block';
+                overlay.style.top = r.top + 'px';
+                overlay.style.left = r.left + 'px';
+                overlay.style.width = r.width + 'px';
+                overlay.style.height = r.height + 'px';
+            }
+
+            function onMove(e) {
+                var el = findPickable(e.clientX, e.clientY);
+                if (el === lastEl) {
+                    if (el) updateOverlay(el);
+                    return;
+                }
+                lastEl = el;
+                if (el) updateOverlay(el);
+                else clearHighlight();
+            }
+
+            function onScroll() {
+                if (lastEl) updateOverlay(lastEl);
+            }
+
+            function cleanup() {
+                document.removeEventListener('click', onClick, true);
+                document.removeEventListener('mousemove', onMove, true);
+                document.removeEventListener('keydown', onKey, true);
+                document.removeEventListener('scroll', onScroll, true);
+                clearHighlight();
+                document.body.style.cursor = prevCursor;
+                if (overlay) { overlay.remove(); overlay = null; }
+            }
+
+            function onKey(e) {
+                if (e.key === 'Escape') {
+                    e.preventDefault();
+                    cleanup();
+                    showToast('Cancelled.', 1200);
+                }
+            }
+
+            function onClick(e) {
+                var target = findPickable(e.clientX, e.clientY);
+                if (!target) return;
                 var url = target.tagName === 'IMG' ? resolveImageUrl(target) : resolveBackgroundUrl(target);
                 if (!url) return;
-
                 e.preventDefault();
                 e.stopPropagation();
-                document.removeEventListener('click', handleClick, true);
-                document.body.style.cursor = prev;
-
-                var absoluteUrl = new URL(url, location.href).href;
+                cleanup();
                 window.open(
-                    origin + '/capture?imageUrl=' + encodeURIComponent(absoluteUrl) + '&pageUrl=' + encodeURIComponent(location.href),
+                    origin + '/capture?imageUrl=' + encodeURIComponent(new URL(url, location.href).href) +
+                    '&pageUrl=' + encodeURIComponent(location.href),
                     '_blank');
             }
 
-            document.addEventListener('click', handleClick, true);
-            alert('Click an image on the page to stash it.');
+            document.addEventListener('click', onClick, true);
+            document.addEventListener('mousemove', onMove, true);
+            document.addEventListener('keydown', onKey, true);
+            document.addEventListener('scroll', onScroll, true);
+            showToast('Click an image to stash it. Esc to cancel.');
         })();`;
 
-        const minified = source.replace(/\s+/g, ' ').trim();
-        document.getElementById('bookmarkletLink').setAttribute('href', 'javascript:' + minified);
+        document.getElementById('bookmarkletLink')
+            .setAttribute('href', 'javascript:' + source.replace(/\s+/g, ' ').trim());
     };
 }
 
