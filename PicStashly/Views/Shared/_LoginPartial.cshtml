@@ -44,7 +44,6 @@
 }
 else
 {
-    @* Self-registration is disabled — PicStashly is single-user; see Areas/Identity/Pages/Account/Register.cshtml *@
     <li class="nav-item">
         @if (AuthProvider.IsKeycloak)
         {
@@ -55,5 +54,13 @@ else
             <a class="nav-link" asp-area="Identity" asp-page="/Account/Login">Login</a>
         }
     </li>
+    @* Keycloak-managed instances create family accounts in Keycloak itself, so self-registration
+       only applies to the built-in Identity provider. *@
+    @if (AuthProvider.IsIdentity)
+    {
+        <li class="nav-item">
+            <a class="nav-link" asp-area="Identity" asp-page="/Account/Register">Register</a>
+        </li>
+    }
 }
 </ul>

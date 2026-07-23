@@ -6,18 +6,23 @@ Think of it as a personal visual search engine, not a photo manager.
 
 ## Features
 
+- **Multi-user**: built for a family (or household) to share one instance while keeping libraries
+  private — every category, tag and image belongs to exactly one account, and no user can see or
+  browse another's images.
 - **Fast capture**: multi-file drag-and-drop (on any page), paste-from-clipboard, a browser
   bookmarklet ("Stash it!" on the Admin page), and a PWA share target so mobile "Share" sends
   images straight into the app.
 - **Tags, not albums**: flat multi-tag model with autocomplete, bulk-tag mode, and a tag
-  management page (rename / merge / delete with usage counts).
+  management page (rename / merge / delete with usage counts). Each user has their own tags.
 - **Categories**: an optional single category per image (e.g. "Memes", "Reaction Images") with its
-  own management page (create / rename / delete). Images are stored on disk under a matching
-  `images/{category-slug}/...` subfolder, so the folder layout stays human-readable.
+  own management page (create / rename / delete) and its own set per user. Images are stored on
+  disk under a matching `images/{user-id}/{category-slug}/...` subfolder, so the folder layout
+  stays human-readable and each user's files are grouped together.
 - **Search-first library**: masonry grid with infinite scroll, combined search across filename,
-  tags and OCR text, tag and category filters, "untagged only" toggle, and random shuffle.
+  tags and OCR text, tag and category filters, "untagged only" toggle, and random shuffle — always
+  scoped to your own images.
 - **Dedup on ingest**: a 64-bit perceptual hash (dHash) is computed for every image; near-duplicates
-  are flagged on upload with a "view existing / save anyway / merge tags" prompt.
+  within your own library are flagged on upload with a "view existing / save anyway / merge tags" prompt.
 - **OCR**: meme captions are extracted with [PaddleOCR](https://github.com/PaddlePaddle/PaddleOCR)
   (PP-OCRv5, in-process via [Sdcb.PaddleOCR](https://github.com/sdcb/PaddleSharp)) and become
   searchable. Models are bundled — nothing to install. Text is editable/correctable per image.
@@ -27,8 +32,9 @@ Think of it as a personal visual search engine, not a photo manager.
 - **Quick actions on the grid**: hover an image tile to edit its tags or delete it without opening
   the lightbox; the lightbox and image details page also support delete and category reassignment.
 - **Authentication**: the whole app sits behind a login screen — built-in ASP.NET Core Identity
-  by default (a local admin account is created on first run), or Keycloak for centralised
-  single sign-on if you already run it for other self-hosted apps.
+  by default (a local admin account is created on first run, and family members can register their
+  own accounts subject to admin approval), or Keycloak for centralised single sign-on if you
+  already run it for other self-hosted apps.
 
 ## Tech stack
 
@@ -57,22 +63,37 @@ environment variables in Docker):
 Migrations for each provider live in the matching `PicStashly.Data.{Provider}` project and are
 applied automatically on startup.
 
-## Authentication
+## Authentication and multi-user
 
-PicStashly is a single-user app, but since it's typically exposed on your home network (or
-further), the whole app sits behind a login screen so it isn't reachable unauthenticated.
+PicStashly is designed for a family or household to share one instance: since it's typically
+exposed on your home network (or further), the whole app sits behind a login screen, and every
+account gets its own private library — categories, tags and images belong to exactly one user
+and are never visible to anyone else (the `Administrator` role can approve/manage accounts on the
+**Admin** page, but does not browse other users' images).
 
 By default it uses **built-in ASP.NET Core Identity**: a local admin account is created
 automatically on first run (`admin@picstashly.local` / `Admin@123` — override via `SeedAdmin`
 in `appsettings.json`, User Secrets, or `SeedAdmin__Email` / `SeedAdmin__Password` env vars).
-Change the password after first login via the **Manage account** link in the navbar.
+Change the password after first login via the **Manage account** link in the navbar. Family
+members can self-register from the login screen, but new accounts start **locked** — an
+administrator must approve them from the **Admin** page (**Family members** card) before they
+can sign in; the same page lets an admin promote/demote the `Administrator` role.
 
 If you already run **Keycloak** for other self-hosted apps, PicStashly can delegate login to
 it instead — set `Authentication:Provider` to `Keycloak` (see the commented block in
 `appsettings.json` or `docker-compose.yml`). See [`docs/KEYCLOAK_SETUP.md`](docs/KEYCLOAK_SETUP.md)
-for full setup instructions. The `Administrator` role (local Identity or a Keycloak realm role)
-is required for the Admin page and its maintenance endpoints; any authenticated user can browse,
-upload, and tag.
+for full setup instructions. With Keycloak, accounts (and the `Administrator` realm role) are
+created and approved in Keycloak itself — the in-app user-approval workflow only applies to the
+built-in Identity provider. Each Keycloak user still gets their own private PicStashly library,
+keyed off their Keycloak account id.
+
+> **Upgrading an existing single-user install:** this version adds a required owner column to
+> categories, images and tags, and nests stored files one level deeper on disk
+> (`images/{user-id}/{category-slug}/...` instead of `images/{category-slug}/...`). Existing
+> rows are migrated with an empty owner id, which means they won't show up for any real account
+> until you assign them (via SQL) to a specific user's id and move their files into that user's
+> folder on disk. For a fresh/test instance, it's simplest to delete the database and `uploads`
+> folder and start over.
 
 ## Configuration
 

@@ -32,6 +32,13 @@ public class Image : BaseEntity<int>
 
     public DateTime DateAdded { get; set; }
 
+    /// <summary>
+    /// Id of the owning user (the ASP.NET Core Identity user id, or the Keycloak "sub" claim
+    /// when using Keycloak). Not modeled as a foreign key since Keycloak-authenticated users
+    /// have no row in the local user table. Also determines the top-level storage subfolder.
+    /// </summary>
+    public required string UserId { get; set; }
+
     /// <summary>Optional category the image is filed under. Also determines its storage subfolder.</summary>
     public int? CategoryId { get; set; }
 
@@ -52,9 +59,10 @@ public class ImageMap : IEntityTypeConfiguration<Image>
         builder.Property(m => m.ContentType).IsRequired().HasMaxLength(128);
         builder.Property(m => m.OcrText).IsUnicode(true);
         builder.Property(m => m.SourceUrl).HasMaxLength(2048);
+        builder.Property(m => m.UserId).IsRequired().HasMaxLength(450);
         builder.HasIndex(m => m.PerceptualHash);
-        builder.HasIndex(m => m.DateAdded);
-        builder.HasIndex(m => m.CategoryId);
+        builder.HasIndex(m => new { m.UserId, m.DateAdded });
+        builder.HasIndex(m => new { m.UserId, m.CategoryId });
         builder.HasOne(m => m.Category)
             .WithMany()
             .HasForeignKey(m => m.CategoryId)

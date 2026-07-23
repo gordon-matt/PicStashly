@@ -238,9 +238,14 @@ namespace PicStashly.Data.MySql.Migrations
                         .IsUnicode(true)
                         .HasColumnType("varchar(256)");
 
+                    b.Property<string>("UserId")
+                        .IsRequired()
+                        .HasMaxLength(450)
+                        .HasColumnType("varchar(450)");
+
                     b.HasKey("Id");
 
-                    b.HasIndex("Name")
+                    b.HasIndex("UserId", "Name")
                         .IsUnique();
 
                     b.ToTable("Categories", (string)null);
@@ -296,6 +301,11 @@ namespace PicStashly.Data.MySql.Migrations
                         .HasMaxLength(512)
                         .HasColumnType("varchar(512)");
 
+                    b.Property<string>("UserId")
+                        .IsRequired()
+                        .HasMaxLength(450)
+                        .HasColumnType("varchar(450)");
+
                     b.Property<int>("Width")
                         .HasColumnType("int");
 
@@ -303,9 +313,11 @@ namespace PicStashly.Data.MySql.Migrations
 
                     b.HasIndex("CategoryId");
 
-                    b.HasIndex("DateAdded");
-
                     b.HasIndex("PerceptualHash");
+
+                    b.HasIndex("UserId", "CategoryId");
+
+                    b.HasIndex("UserId", "DateAdded");
 
                     b.ToTable("Images", (string)null);
                 });
@@ -337,9 +349,14 @@ namespace PicStashly.Data.MySql.Migrations
                         .IsUnicode(true)
                         .HasColumnType("varchar(128)");
 
+                    b.Property<string>("UserId")
+                        .IsRequired()
+                        .HasMaxLength(450)
+                        .HasColumnType("varchar(450)");
+
                     b.HasKey("Id");
 
-                    b.HasIndex("Name")
+                    b.HasIndex("UserId", "Name")
                         .IsUnique();
 
                     b.ToTable("Tags", (string)null);

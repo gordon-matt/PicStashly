@@ -247,9 +247,14 @@ namespace PicStashly.Data.Npgsql.Migrations
                         .IsUnicode(true)
                         .HasColumnType("character varying(256)");
 
+                    b.Property<string>("UserId")
+                        .IsRequired()
+                        .HasMaxLength(450)
+                        .HasColumnType("character varying(450)");
+
                     b.HasKey("Id");
 
-                    b.HasIndex("Name")
+                    b.HasIndex("UserId", "Name")
                         .IsUnique();
 
                     b.ToTable("Categories", "app");
@@ -307,6 +312,11 @@ namespace PicStashly.Data.Npgsql.Migrations
                         .HasMaxLength(512)
                         .HasColumnType("character varying(512)");
 
+                    b.Property<string>("UserId")
+                        .IsRequired()
+                        .HasMaxLength(450)
+                        .HasColumnType("character varying(450)");
+
                     b.Property<int>("Width")
                         .HasColumnType("integer");
 
@@ -314,9 +324,11 @@ namespace PicStashly.Data.Npgsql.Migrations
 
                     b.HasIndex("CategoryId");
 
-                    b.HasIndex("DateAdded");
-
                     b.HasIndex("PerceptualHash");
+
+                    b.HasIndex("UserId", "CategoryId");
+
+                    b.HasIndex("UserId", "DateAdded");
 
                     b.ToTable("Images", "app");
                 });
@@ -350,9 +362,14 @@ namespace PicStashly.Data.Npgsql.Migrations
                         .IsUnicode(true)
                         .HasColumnType("character varying(128)");
 
+                    b.Property<string>("UserId")
+                        .IsRequired()
+                        .HasMaxLength(450)
+                        .HasColumnType("character varying(450)");
+
                     b.HasKey("Id");
 
-                    b.HasIndex("Name")
+                    b.HasIndex("UserId", "Name")
                         .IsUnique();
 
                     b.ToTable("Tags", "app");

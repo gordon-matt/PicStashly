@@ -2,6 +2,7 @@ namespace PicStashly.Services;
 
 public class CategoryService(
     ILogger<CategoryService> logger,
+    IUserContextService userContext,
     IRepository<Category> categoryRepository,
     IRepository<Image> imageRepository) : ICategoryService
 {
@@ -9,14 +10,17 @@ public class CategoryService(
     {
         try
         {
+            string userId = userContext.GetRequiredUserId();
+
             var categories = await categoryRepository.FindAsync(new SearchOptions<Category>
             {
+                Query = c => c.UserId == userId,
                 OrderBy = query => query.OrderBy(c => c.Name)
             });
 
             var imageCounts = await imageRepository.FindAsync(new SearchOptions<Image>
             {
-                Query = i => i.CategoryId != null
+                Query = i => i.UserId == userId && i.CategoryId != null
             }, i => i.CategoryId);
 
             var countByCategory = imageCounts
@@ -44,19 +48,21 @@ public class CategoryService(
     {
         try
         {
+            string userId = userContext.GetRequiredUserId();
+
             string name = request.Name?.Trim() ?? string.Empty;
             if (string.IsNullOrWhiteSpace(name))
             {
                 return Result.Invalid([new ValidationError("Name", "Category name cannot be empty")]);
             }
 
-            bool nameTaken = await categoryRepository.ExistsAsync(x => x.Name.ToLower() == name.ToLower());
+            bool nameTaken = await categoryRepository.ExistsAsync(x => x.UserId == userId && x.Name.ToLower() == name.ToLower());
             if (nameTaken)
             {
                 return Result.Invalid([new ValidationError("Name", "A category with this name already exists")]);
             }
 
-            var category = await categoryRepository.InsertAsync(new Category { Name = name });
+            var category = await categoryRepository.InsertAsync(new Category { Name = name, UserId = userId });
             return Result.Success(new CategoryItem(category.Id, category.Name, 0));
         }
         catch (Exception ex)
@@ -74,19 +80,25 @@ public class CategoryService(
     {
         try
         {
+            string userId = userContext.GetRequiredUserId();
+
             string name = request.Name?.Trim() ?? string.Empty;
             if (string.IsNullOrWhiteSpace(name))
             {
                 return Result.Invalid([new ValidationError("Name", "Category name cannot be empty")]);
             }
 
-            var category = await categoryRepository.FindOneAsync(categoryId);
+            var category = await categoryRepository.FindOneAsync(new SearchOptions<Category>
+            {
+                Query = c => c.Id == categoryId && c.UserId == userId
+            });
             if (category is null)
             {
                 return Result.NotFound("Category not found");
             }
 
-            bool nameTaken = await categoryRepository.ExistsAsync(x => x.Id != categoryId && x.Name.ToLower() == name.ToLower());
+            bool nameTaken = await categoryRepository.ExistsAsync(
+                x => x.UserId == userId && x.Id != categoryId && x.Name.ToLower() == name.ToLower());
             if (nameTaken)
             {
                 return Result.Invalid([new ValidationError("Name", "A category with this name already exists")]);
@@ -95,7 +107,7 @@ public class CategoryService(
             category.Name = name;
             await categoryRepository.UpdateAsync(category);
 
-            int usageCount = await imageRepository.CountAsync(x => x.CategoryId == categoryId);
+            int usageCount = await imageRepository.CountAsync(x => x.CategoryId == categoryId && x.UserId == userId);
             return Result.Success(new CategoryItem(category.Id, category.Name, usageCount));
         }
         catch (Exception ex)
@@ -113,7 +125,12 @@ public class CategoryService(
     {
         try
         {
-            var category = await categoryRepository.FindOneAsync(categoryId);
+            string userId = userContext.GetRequiredUserId();
+
+            var category = await categoryRepository.FindOneAsync(new SearchOptions<Category>
+            {
+                Query = c => c.Id == categoryId && c.UserId == userId
+            });
             if (category is null)
             {
                 return Result.NotFound("Category not found");

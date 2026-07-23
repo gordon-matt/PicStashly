@@ -19,10 +19,13 @@ public static class ServiceCollectionExtensions
                     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36");
             });
 
+            services.AddHttpContextAccessor();
+
             services.AddSingleton<IFileStorageService, FileStorageService>();
             services.AddSingleton<IPerceptualHashService, PerceptualHashService>();
             services.AddSingleton<IOcrService, OcrService>();
 
+            services.AddScoped<IUserContextService, UserContextService>();
             services.AddScoped<IImageService, ImageService>();
             services.AddScoped<ITagService, TagService>();
             services.AddScoped<ICategoryService, CategoryService>();

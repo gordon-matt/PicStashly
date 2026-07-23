@@ -1,5 +1,9 @@
+@using System.Security.Claims
+@using PicStashly.Infrastructure
+@inject IAuthProviderService AuthProvider
 @{
     ViewData["Title"] = "Admin";
+    var currentUserId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value ?? string.Empty;
 }
 
 <div class="container">
@@ -98,6 +102,88 @@
         </div>
     </div>
 
+    @if (AuthProvider.IsIdentity)
+    {
+        <!-- User management -->
+        <div class="card mb-4">
+            <div class="card-header"><i class="bi bi-people me-1"></i> Family members</div>
+            <div class="card-body">
+                <p class="text-muted small">
+                    Anyone can register an account, but new accounts start locked — approve them here
+                    before they can log in. Each family member's images, tags and categories are
+                    private to their own account.
+                </p>
+
+                <div data-bind="visible: usersLoading" class="text-center py-3">
+                    <div class="spinner-border spinner-border-sm text-primary" role="status">
+                        <span class="visually-hidden">Loading…</span>
+                    </div>
+                </div>
+
+                <div data-bind="visible: !usersLoading()" style="display: none;">
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Email</th>
+                                    <th>Status</th>
+                                    <th>Role</th>
+                                    <th></th>
+                                </tr>
+                            </thead>
+                            <tbody data-bind="foreach: users">
+                                <tr>
+                                    <td>
+                                        <span data-bind="text: email"></span>
+                                        <!-- ko if: isCurrentUser -->
+                                        <span class="badge bg-secondary ms-1">You</span>
+                                        <!-- /ko -->
+                                    </td>
+                                    <td>
+                                        <!-- ko if: isPendingApproval -->
+                                        <span class="badge bg-warning text-dark"><i class="bi bi-hourglass-split"></i> Pending approval</span>
+                                        <!-- /ko -->
+                                        <!-- ko ifnot: isPendingApproval -->
+                                        <span class="badge bg-success"><i class="bi bi-check-circle"></i> Active</span>
+                                        <!-- /ko -->
+                                    </td>
+                                    <td>
+                                        <!-- ko if: isCurrentUser -->
+                                        <span class="badge rounded-pill text-bg-primary" data-bind="text: role()"></span>
+                                        <!-- /ko -->
+                                        <!-- ko ifnot: isCurrentUser -->
+                                        <select class="form-select form-select-sm" style="width:auto;"
+                                                data-bind="value: role, event: { change: function (user, evt) { $root.changeUserRole(user, evt); } }">
+                                            <option value="Administrator">Administrator</option>
+                                            <option value="User">User</option>
+                                        </select>
+                                        <!-- /ko -->
+                                    </td>
+                                    <td class="text-end">
+                                        <!-- ko if: isPendingApproval -->
+                                        <button class="btn btn-sm btn-success" data-bind="click: $root.approveUser">
+                                            <i class="bi bi-check-lg"></i> Approve
+                                        </button>
+                                        <!-- /ko -->
+                                        <!-- ko ifnot: isPendingApproval -->
+                                        <button class="btn btn-sm btn-outline-warning" data-bind="click: $root.lockUser, disable: isCurrentUser">
+                                            <i class="bi bi-lock"></i> Lock
+                                        </button>
+                                        <!-- /ko -->
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="text-muted text-center py-2" data-bind="visible: users().length === 0">
+                        No users found.
+                    </div>
+                </div>
+            </div>
+        </div>
+    }
+
     <!-- Bookmarklet -->
     <div class="card mb-4">
         <div class="card-header"><i class="bi bi-bookmark-plus me-1"></i> Bookmarklet</div>
@@ -115,5 +201,9 @@
 </div>
 
 @section Scripts {
+    <script>
+        window.picstashlyCurrentUserId = '@currentUserId';
+        window.picstashlyIsIdentityAuth = @(AuthProvider.IsIdentity ? "true" : "false");
+    </script>
     <script type="module" src="~/js/admin.js" asp-append-version="true"></script>
 }

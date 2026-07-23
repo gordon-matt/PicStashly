@@ -122,7 +122,7 @@ public class FileStorageService(IConfiguration configuration, IOptions<ImageProc
     {
         string fullPath = GetFullPath(storagePath);
         string fileBaseName = Path.GetFileNameWithoutExtension(storagePath);
-        string categoryFolder = GetCategoryFolderFromPath(storagePath);
+        string categoryFolder = GetSubfolderFromPath(storagePath);
 
         using var image = await ImageSharpImage.LoadAsync(fullPath, cancellationToken);
         return await GenerateThumbnailAsync(image, fileBaseName, categoryFolder, cancellationToken);
@@ -202,11 +202,13 @@ public class FileStorageService(IConfiguration configuration, IOptions<ImageProc
         }
     }
 
-    private static string GetCategoryFolderFromPath(string relativePath)
+    private static string GetSubfolderFromPath(string relativePath)
     {
-        // Expected shape: "images/{categoryFolder}/{fileName}"
+        // Expected shape: "images/{userId}/{categoryFolder}/{fileName}" — everything between the
+        // top-level "images"/"thumbnails" segment and the file name is the caller-supplied folder
+        // (userId, or userId + category slug), so this stays correct regardless of nesting depth.
         string[] parts = relativePath.Split('/');
-        return parts.Length >= 3 ? parts[1] : UncategorizedFolder;
+        return parts.Length >= 3 ? string.Join('/', parts[1..^1]) : UncategorizedFolder;
     }
 
     private static string Slugify(string value)

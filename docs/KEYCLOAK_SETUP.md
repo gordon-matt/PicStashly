@@ -1,10 +1,11 @@
 # Keycloak Setup Guide for PicStashly
 
-By default PicStashly protects itself with a single built-in ASP.NET Core Identity account
-(created automatically on first run — see `SeedAdmin` in `appsettings.json`). This is enough
-for most self-hosted setups. This guide is only needed if you want to delegate login to an
-external Keycloak server instead — typically because you already run Keycloak for other
-self-hosted apps and want PicStashly to share the same login.
+By default PicStashly protects itself with built-in ASP.NET Core Identity (a local admin account
+is created automatically on first run — see `SeedAdmin` in `appsettings.json` — and family members
+can self-register subject to admin approval). This is enough for most self-hosted setups. This
+guide is only needed if you want to delegate login to an external Keycloak server instead —
+typically because you already run Keycloak for other self-hosted apps and want PicStashly to
+share the same login.
 
 ## Overview
 
@@ -14,10 +15,13 @@ Browser → PicStashly → redirects to Keycloak login page
          PicStashly reads the token → user is authenticated
 ```
 
-There is no per-user data in PicStashly (it's a single-user app) — Keycloak here is purely a
-login gate, not a multi-tenant user system. Any user who successfully authenticates is treated
-the same, **except** that the `Administrator` role additionally unlocks the Admin page and its
-API endpoints.
+Every PicStashly account — local Identity or Keycloak — gets its own private library: categories,
+tags and images belong to exactly one user and are not visible to anyone else. Keycloak here is a
+login gate that PicStashly layers its per-user data model on top of (keyed off each Keycloak
+user's stable subject/account id); it isn't PicStashly's multi-tenancy mechanism by itself. Any
+user who successfully authenticates can use the library, **except** that the `Administrator` role
+additionally unlocks the Admin page and its API endpoints (which manage user approval when using
+local Identity, and run system-wide maintenance regardless of provider).
 
 ## Prerequisites
 

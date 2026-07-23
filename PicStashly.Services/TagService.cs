@@ -2,6 +2,7 @@ namespace PicStashly.Services;
 
 public class TagService(
     ILogger<TagService> logger,
+    IUserContextService userContext,
     IRepository<Tag> tagRepository,
     IRepository<ImageTag> imageTagRepository) : ITagService
 {
@@ -9,8 +10,11 @@ public class TagService(
     {
         try
         {
+            string userId = userContext.GetRequiredUserId();
+
             var tags = await tagRepository.FindAsync(new SearchOptions<Tag>
             {
+                Query = t => t.UserId == userId,
                 OrderBy = query => query.OrderBy(t => t.Name)
             }, t => new TagItem(t.Id, t.Name, t.ImageTags.Count));
 
@@ -33,19 +37,24 @@ public class TagService(
     {
         try
         {
+            string userId = userContext.GetRequiredUserId();
+
             string name = request.Name?.Trim().ToLowerInvariant() ?? string.Empty;
             if (string.IsNullOrWhiteSpace(name))
             {
                 return Result.Invalid([new ValidationError("Name", "Tag name cannot be empty")]);
             }
 
-            var tag = await tagRepository.FindOneAsync(tagId);
+            var tag = await tagRepository.FindOneAsync(new SearchOptions<Tag>
+            {
+                Query = t => t.Id == tagId && t.UserId == userId
+            });
             if (tag is null)
             {
                 return Result.NotFound("Tag not found");
             }
 
-            bool nameTaken = await tagRepository.ExistsAsync(x => x.Id != tagId && x.Name == name);
+            bool nameTaken = await tagRepository.ExistsAsync(x => x.UserId == userId && x.Id != tagId && x.Name == name);
             if (nameTaken)
             {
                 return Result.Invalid([new ValidationError("Name",
@@ -73,6 +82,8 @@ public class TagService(
     {
         try
         {
+            string userId = userContext.GetRequiredUserId();
+
             var sourceIds = request.SourceTagIds
                 ?.Where(id => id != request.TargetTagId)
                 .Distinct()
@@ -83,15 +94,28 @@ public class TagService(
                 return Result.Invalid([new ValidationError("SourceTagIds", "At least one source tag is required")]);
             }
 
-            var target = await tagRepository.FindOneAsync(request.TargetTagId);
+            var target = await tagRepository.FindOneAsync(new SearchOptions<Tag>
+            {
+                Query = t => t.Id == request.TargetTagId && t.UserId == userId
+            });
             if (target is null)
             {
                 return Result.NotFound("Target tag not found");
             }
 
+            // Restrict the merge to tags owned by the current user, even if extra/foreign ids were sent.
+            var ownedSourceIds = (await tagRepository.FindAsync(
+                new SearchOptions<Tag> { Query = t => sourceIds.Contains(t.Id) && t.UserId == userId },
+                t => t.Id)).ToList();
+
+            if (ownedSourceIds.Count == 0)
+            {
+                return Result.Invalid([new ValidationError("SourceTagIds", "At least one source tag is required")]);
+            }
+
             var sourceLinks = await imageTagRepository.FindAsync(new SearchOptions<ImageTag>
             {
-                Query = x => sourceIds.Contains(x.TagId)
+                Query = x => ownedSourceIds.Contains(x.TagId)
             });
 
             var imageIdsAlreadyLinkedToTarget = (await imageTagRepository.FindAsync(
@@ -111,8 +135,8 @@ public class TagService(
                 await imageTagRepository.InsertAsync(newLinks);
             }
 
-            await imageTagRepository.DeleteAsync(x => sourceIds.Contains(x.TagId));
-            await tagRepository.DeleteAsync(x => sourceIds.Contains(x.Id));
+            await imageTagRepository.DeleteAsync(x => ownedSourceIds.Contains(x.TagId));
+            await tagRepository.DeleteAsync(x => ownedSourceIds.Contains(x.Id));
 
             return Result.Success();
         }
@@ -131,7 +155,12 @@ public class TagService(
     {
         try
         {
-            var tag = await tagRepository.FindOneAsync(tagId);
+            string userId = userContext.GetRequiredUserId();
+
+            var tag = await tagRepository.FindOneAsync(new SearchOptions<Tag>
+            {
+                Query = t => t.Id == tagId && t.UserId == userId
+            });
             if (tag is null)
             {
                 return Result.NotFound("Tag not found");

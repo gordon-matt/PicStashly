@@ -6,6 +6,7 @@ public class ImageService(
     ILogger<ImageService> logger,
     IOptions<UploadOptions> uploadOptions,
     IHttpClientFactory httpClientFactory,
+    IUserContextService userContext,
     IFileStorageService fileStorage,
     IPerceptualHashService perceptualHash,
     IOcrService ocr,
@@ -18,10 +19,12 @@ public class ImageService(
     {
         try
         {
+            string userId = userContext.GetRequiredUserId();
+
             int page = Math.Max(1, request.Page);
             int pageSize = Math.Clamp(request.PageSize, 1, 200);
 
-            var predicate = BuildSearchPredicate(request);
+            var predicate = BuildSearchPredicate(request, userId);
 
             if (request.Sort.Equals("random", StringComparison.OrdinalIgnoreCase))
             {
@@ -71,7 +74,7 @@ public class ImageService(
     {
         try
         {
-            var image = await FindWithTagsAsync(id);
+            var image = await FindWithTagsAsync(id, userContext.GetRequiredUserId());
             return image is null
                 ? Result.NotFound("Image not found")
                 : Result.Success(MapToDetail(image));
@@ -96,6 +99,7 @@ public class ImageService(
         bool force,
         CancellationToken cancellationToken = default)
     {
+        string userId = userContext.GetRequiredUserId();
         var opts = uploadOptions.Value;
 
         string extension = Path.GetExtension(fileName).ToLowerInvariant();
@@ -108,7 +112,10 @@ public class ImageService(
         Category? category = null;
         if (categoryId is int wantedCategoryId)
         {
-            category = await categoryRepository.FindOneAsync(wantedCategoryId);
+            category = await categoryRepository.FindOneAsync(new SearchOptions<Category>
+            {
+                Query = c => c.Id == wantedCategoryId && c.UserId == userId
+            });
             if (category is null)
             {
                 return Result.Invalid([new ValidationError("CategoryId", "Category not found")]);
@@ -116,11 +123,12 @@ public class ImageService(
         }
 
         string categoryFolder = fileStorage.GetCategoryFolderName(category?.Id, category?.Name);
+        string storageFolder = $"{userId}/{categoryFolder}";
 
         StoredImageFile? stored = null;
         try
         {
-            stored = await fileStorage.SaveImageAsync(stream, fileName, categoryFolder, cancellationToken);
+            stored = await fileStorage.SaveImageAsync(stream, fileName, storageFolder, cancellationToken);
 
             if (stored.FileSizeBytes > opts.MaxFileSizeBytes)
             {
@@ -134,7 +142,7 @@ public class ImageService(
 
             if (!force)
             {
-                var duplicates = await FindDuplicatesAsync(hash);
+                var duplicates = await FindDuplicatesAsync(hash, userId);
                 if (duplicates.Count > 0)
                 {
                     fileStorage.DeleteFile(stored.StoragePath);
@@ -158,16 +166,17 @@ public class ImageService(
                 OcrText = ocrText,
                 SourceUrl = sourceUrl,
                 DateAdded = DateTime.UtcNow,
+                UserId = userId,
                 CategoryId = category?.Id
             });
 
             var normalizedTags = NormalizeTagNames(tagNames);
             if (normalizedTags.Count > 0)
             {
-                await AddTagsToImageAsync(image.Id, normalizedTags);
+                await AddTagsToImageAsync(image.Id, normalizedTags, userId);
             }
 
-            var saved = await FindWithTagsAsync(image.Id);
+            var saved = await FindWithTagsAsync(image.Id, userId);
             return Result.Success(IngestResult.Saved(MapToDetail(saved!)));
         }
         catch (SixLabors.ImageSharp.ImageFormatException)
@@ -248,7 +257,12 @@ public class ImageService(
     {
         try
         {
-            var image = await imageRepository.FindOneAsync(id);
+            string userId = userContext.GetRequiredUserId();
+
+            var image = await imageRepository.FindOneAsync(new SearchOptions<Image>
+            {
+                Query = x => x.Id == id && x.UserId == userId
+            });
             if (image is null)
             {
                 return Result.NotFound("Image not found");
@@ -277,7 +291,9 @@ public class ImageService(
     {
         try
         {
-            bool imageExists = await imageRepository.ExistsAsync(x => x.Id == id);
+            string userId = userContext.GetRequiredUserId();
+
+            bool imageExists = await imageRepository.ExistsAsync(x => x.Id == id && x.UserId == userId);
             if (!imageExists)
             {
                 return Result.NotFound("Image not found");
@@ -305,7 +321,7 @@ public class ImageService(
 
             if (toAdd.Count > 0)
             {
-                await AddTagsToImageAsync(id, toAdd);
+                await AddTagsToImageAsync(id, toAdd, userId);
             }
 
             return Result.Success(selectedTagNames);
@@ -325,7 +341,12 @@ public class ImageService(
     {
         try
         {
-            var image = await imageRepository.FindOneAsync(id);
+            string userId = userContext.GetRequiredUserId();
+
+            var image = await imageRepository.FindOneAsync(new SearchOptions<Image>
+            {
+                Query = x => x.Id == id && x.UserId == userId
+            });
             if (image is null)
             {
                 return Result.NotFound("Image not found");
@@ -334,7 +355,10 @@ public class ImageService(
             Category? category = null;
             if (request.CategoryId is int wantedCategoryId)
             {
-                category = await categoryRepository.FindOneAsync(wantedCategoryId);
+                category = await categoryRepository.FindOneAsync(new SearchOptions<Category>
+                {
+                    Query = c => c.Id == wantedCategoryId && c.UserId == userId
+                });
                 if (category is null)
                 {
                     return Result.Invalid([new ValidationError("CategoryId", "Category not found")]);
@@ -342,15 +366,16 @@ public class ImageService(
             }
 
             string newCategoryFolder = fileStorage.GetCategoryFolderName(category?.Id, category?.Name);
+            string newStorageFolder = $"{userId}/{newCategoryFolder}";
             var (newStoragePath, newThumbnailPath) = await fileStorage.MoveToCategoryAsync(
-                image.StoragePath, image.ThumbnailPath, newCategoryFolder);
+                image.StoragePath, image.ThumbnailPath, newStorageFolder);
 
             image.CategoryId = category?.Id;
             image.StoragePath = newStoragePath;
             image.ThumbnailPath = newThumbnailPath;
             await imageRepository.UpdateAsync(image);
 
-            var saved = await FindWithTagsAsync(id);
+            var saved = await FindWithTagsAsync(id, userId);
             return Result.Success(MapToDetail(saved!));
         }
         catch (Exception ex)
@@ -368,7 +393,12 @@ public class ImageService(
     {
         try
         {
-            var image = await imageRepository.FindOneAsync(id);
+            string userId = userContext.GetRequiredUserId();
+
+            var image = await imageRepository.FindOneAsync(new SearchOptions<Image>
+            {
+                Query = x => x.Id == id && x.UserId == userId
+            });
             if (image is null)
             {
                 return Result.NotFound("Image not found");
@@ -394,7 +424,7 @@ public class ImageService(
     {
         try
         {
-            var image = await FindWithTagsAsync(id);
+            var image = await FindWithTagsAsync(id, userContext.GetRequiredUserId());
             if (image is null)
             {
                 return Result.NotFound("Image not found");
@@ -442,10 +472,22 @@ public class ImageService(
     {
         try
         {
-            var imageIds = request.ImageIds?.Distinct().ToList() ?? [];
+            string userId = userContext.GetRequiredUserId();
+
+            var requestedImageIds = request.ImageIds?.Distinct().ToList() ?? [];
             var tagNames = NormalizeTagNames(request.TagNames);
 
-            if (imageIds.Count == 0 || tagNames.Count == 0)
+            if (requestedImageIds.Count == 0 || tagNames.Count == 0)
+            {
+                return Result.Invalid([new ValidationError("ImageIds", "At least one image and one tag are required")]);
+            }
+
+            // Only ever touch images owned by the current user, even if extra/foreign ids were sent.
+            var imageIds = (await imageRepository.FindAsync(
+                new SearchOptions<Image> { Query = x => requestedImageIds.Contains(x.Id) && x.UserId == userId },
+                x => x.Id)).ToList();
+
+            if (imageIds.Count == 0)
             {
                 return Result.Invalid([new ValidationError("ImageIds", "At least one image and one tag are required")]);
             }
@@ -453,7 +495,7 @@ public class ImageService(
             if (request.Remove)
             {
                 var tagIds = (await tagRepository.FindAsync(
-                    new SearchOptions<Tag> { Query = x => tagNames.Contains(x.Name) },
+                    new SearchOptions<Tag> { Query = x => tagNames.Contains(x.Name) && x.UserId == userId },
                     x => x.Id)).ToList();
 
                 if (tagIds.Count > 0)
@@ -465,7 +507,7 @@ public class ImageService(
                 return Result.Success();
             }
 
-            var tagByName = await EnsureTagsAsync(tagNames);
+            var tagByName = await EnsureTagsAsync(tagNames, userId);
 
             var existingLinks = await imageTagRepository.FindAsync(new SearchOptions<ImageTag>
             {
@@ -497,9 +539,9 @@ public class ImageService(
         }
     }
 
-    private System.Linq.Expressions.Expression<Func<Image, bool>> BuildSearchPredicate(ImageSearchRequest request)
+    private static System.Linq.Expressions.Expression<Func<Image, bool>> BuildSearchPredicate(ImageSearchRequest request, string userId)
     {
-        var predicate = PredicateBuilder.New<Image>(true);
+        var predicate = PredicateBuilder.New<Image>(i => i.UserId == userId);
 
         if (!string.IsNullOrWhiteSpace(request.Search))
         {
@@ -592,13 +634,13 @@ public class ImageService(
             pageSize));
     }
 
-    private async Task<List<DuplicateMatch>> FindDuplicatesAsync(long hash)
+    private async Task<List<DuplicateMatch>> FindDuplicatesAsync(long hash, string userId)
     {
         int threshold = uploadOptions.Value.DuplicateHammingThreshold;
 
         // pHash comparison has to happen in memory (no SQL popcount), but the projection is tiny.
         var candidates = await imageRepository.FindAsync(
-            new SearchOptions<Image>(),
+            new SearchOptions<Image> { Query = x => x.UserId == userId },
             x => new { x.Id, x.PerceptualHash });
 
         var matchDistances = candidates
@@ -635,14 +677,14 @@ public class ImageService(
             .ToList();
     }
 
-    private async Task AddTagsToImageAsync(int imageId, List<string> tagNames)
+    private async Task AddTagsToImageAsync(int imageId, List<string> tagNames, string userId)
     {
-        var tagByName = await EnsureTagsAsync(tagNames);
+        var tagByName = await EnsureTagsAsync(tagNames, userId);
         await imageTagRepository.InsertAsync(
             tagNames.Select(name => new ImageTag { ImageId = imageId, TagId = tagByName[name].Id }));
     }
 
-    private async Task<Dictionary<string, Tag>> EnsureTagsAsync(List<string> normalizedNames)
+    private async Task<Dictionary<string, Tag>> EnsureTagsAsync(List<string> normalizedNames, string userId)
     {
         var result = new Dictionary<string, Tag>(StringComparer.OrdinalIgnoreCase);
         if (normalizedNames.Count == 0)
@@ -652,7 +694,7 @@ public class ImageService(
 
         var existing = await tagRepository.FindAsync(new SearchOptions<Tag>
         {
-            Query = x => normalizedNames.Contains(x.Name)
+            Query = x => normalizedNames.Contains(x.Name) && x.UserId == userId
         });
 
         foreach (var tag in existing)
@@ -663,7 +705,7 @@ public class ImageService(
         var missing = normalizedNames.Where(n => !result.ContainsKey(n)).ToList();
         if (missing.Count > 0)
         {
-            var newTags = missing.Select(n => new Tag { Name = n }).ToList();
+            var newTags = missing.Select(n => new Tag { Name = n, UserId = userId }).ToList();
             await tagRepository.InsertAsync(newTags);
             foreach (var tag in newTags)
             {
@@ -692,9 +734,9 @@ public class ImageService(
         }
     }
 
-    private async Task<Image?> FindWithTagsAsync(int id) => await imageRepository.FindOneAsync(new SearchOptions<Image>
+    private async Task<Image?> FindWithTagsAsync(int id, string userId) => await imageRepository.FindOneAsync(new SearchOptions<Image>
     {
-        Query = x => x.Id == id,
+        Query = x => x.Id == id && x.UserId == userId,
 
         Include = query => query
             .Include(i => i.Category)

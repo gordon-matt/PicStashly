@@ -1,7 +1,5 @@
 using System.Net;
 using Microsoft.AspNetCore.Http.Features;
-using Microsoft.AspNetCore.StaticFiles;
-using Microsoft.Extensions.FileProviders;
 using PicStashly;
 using PicStashly.Infrastructure;
 using PicStashly.Services;
@@ -91,31 +89,14 @@ if (!useKeycloak)
 
 app.UseStaticFiles();
 
-// Serve stored images and thumbnails from the storage folder under /media (images only).
+// Ensure the storage folder exists; stored images/thumbnails are served under /media by
+// MediaController, which checks per-user ownership (each user's files live in their own
+// subfolder), unlike plain static-files middleware which can't do that.
 {
     string storagePath = app.Configuration.GetValue<string>("FileStorage:BasePath")
         ?? Path.Combine(Directory.GetCurrentDirectory(), "uploads");
 
     Directory.CreateDirectory(storagePath);
-
-    var imageContentTypeProvider = new FileExtensionContentTypeProvider(
-        new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
-        {
-            [".jpg"] = "image/jpeg",
-            [".jpeg"] = "image/jpeg",
-            [".png"] = "image/png",
-            [".webp"] = "image/webp",
-            [".gif"] = "image/gif",
-            [".bmp"] = "image/bmp",
-        });
-
-    app.UseStaticFiles(new StaticFileOptions
-    {
-        FileProvider = new PhysicalFileProvider(storagePath),
-        RequestPath = Constants.MediaRequestPath,
-        ContentTypeProvider = imageContentTypeProvider,
-        ServeUnknownFileTypes = false
-    });
 }
 
 app.UseRouting();

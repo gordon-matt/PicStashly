@@ -236,9 +236,14 @@ namespace PicStashly.Data.Sqlite.Migrations
                         .IsUnicode(true)
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("UserId")
+                        .IsRequired()
+                        .HasMaxLength(450)
+                        .HasColumnType("TEXT");
+
                     b.HasKey("Id");
 
-                    b.HasIndex("Name")
+                    b.HasIndex("UserId", "Name")
                         .IsUnique();
 
                     b.ToTable("Categories", "app");
@@ -294,6 +299,11 @@ namespace PicStashly.Data.Sqlite.Migrations
                         .HasMaxLength(512)
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("UserId")
+                        .IsRequired()
+                        .HasMaxLength(450)
+                        .HasColumnType("TEXT");
+
                     b.Property<int>("Width")
                         .HasColumnType("INTEGER");
 
@@ -301,9 +311,11 @@ namespace PicStashly.Data.Sqlite.Migrations
 
                     b.HasIndex("CategoryId");
 
-                    b.HasIndex("DateAdded");
-
                     b.HasIndex("PerceptualHash");
+
+                    b.HasIndex("UserId", "CategoryId");
+
+                    b.HasIndex("UserId", "DateAdded");
 
                     b.ToTable("Images", "app");
                 });
@@ -335,9 +347,14 @@ namespace PicStashly.Data.Sqlite.Migrations
                         .IsUnicode(true)
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("UserId")
+                        .IsRequired()
+                        .HasMaxLength(450)
+                        .HasColumnType("TEXT");
+
                     b.HasKey("Id");
 
-                    b.HasIndex("Name")
+                    b.HasIndex("UserId", "Name")
                         .IsUnique();
 
                     b.ToTable("Tags", "app");

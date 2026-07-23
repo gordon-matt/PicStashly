@@ -30,6 +30,8 @@ public interface IFileStorageService
     /// a batch upload) — downscaling to the configured maximum dimensions when needed, and generates a
     /// thumbnail under the matching path in <c>thumbnails/{categoryFolder}/</c>.
     /// The original format is preserved; images that don't need downscaling are stored byte-for-byte.
+    /// <paramref name="categoryFolder"/> is caller-supplied and may contain multiple path segments
+    /// (e.g. <c>"{userId}/{category-slug}"</c>) so callers can nest storage per owner.
     /// </summary>
     Task<StoredImageFile> SaveImageAsync(Stream sourceStream, string originalFileName, string categoryFolder, CancellationToken cancellationToken = default);
 

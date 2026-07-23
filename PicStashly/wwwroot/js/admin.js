@@ -7,6 +7,9 @@ class AdminViewModel {
         this.maintenanceMessage = ko.observable('');
         this.orphanResult = ko.observable(null);
 
+        this.users = ko.observableArray([]);
+        this.usersLoading = ko.observable(true);
+
         this.formatFileSize = formatFileSize;
         this.formatNumber = formatNumber;
     }
@@ -14,6 +17,90 @@ class AdminViewModel {
     init = async () => {
         this._buildBookmarklet();
         await this.loadStats();
+
+        if (window.picstashlyIsIdentityAuth) {
+            await this.loadUsers();
+        }
+    };
+
+    loadUsers = async () => {
+        this.usersLoading(true);
+        try {
+            const response = await fetch('/api/admin/users');
+            if (response.ok) {
+                const data = await response.json();
+                const currentUserId = window.picstashlyCurrentUserId;
+                this.users(data.map(u => ({
+                    ...u,
+                    role: ko.observable(u.role),
+                    isCurrentUser: u.userId === currentUserId
+                })));
+            }
+        } catch (error) {
+            console.error('Error loading users:', error);
+        } finally {
+            this.usersLoading(false);
+        }
+    };
+
+    approveUser = async (user) => {
+        try {
+            const response = await fetch(`/api/admin/users/${user.userId}/approve`, { method: 'POST' });
+            if (response.ok) {
+                toast.success(`${user.email} approved.`);
+                user.isPendingApproval = false;
+                this.users.valueHasMutated();
+            } else {
+                const err = await response.json().catch(() => null);
+                toast.error(err?.message || 'Could not approve user.');
+            }
+        } catch (error) {
+            console.error('Error approving user:', error);
+            toast.error('Error approving user.');
+        }
+    };
+
+    lockUser = async (user) => {
+        if (!confirm(`Lock account for ${user.email}?`)) return;
+        try {
+            const response = await fetch(`/api/admin/users/${user.userId}/lock`, { method: 'POST' });
+            if (response.ok) {
+                toast.success(`${user.email} locked.`);
+                user.isPendingApproval = true;
+                this.users.valueHasMutated();
+            } else {
+                const err = await response.json().catch(() => null);
+                toast.error(err?.message || 'Could not lock user.');
+            }
+        } catch (error) {
+            console.error('Error locking user:', error);
+            toast.error('Error locking user.');
+        }
+    };
+
+    changeUserRole = async (user, evt) => {
+        // Read from the DOM: Knockout's `change` can run before `value` updates the observable,
+        // so user.role() would still be the previous selection (often wrong).
+        const newRole = evt?.target?.value ?? user.role();
+        try {
+            const response = await fetch(`/api/admin/users/${user.userId}/role`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ role: newRole })
+            });
+            if (response.ok) {
+                user.role(newRole);
+                toast.success(`${user.email} is now ${newRole}.`);
+            } else {
+                const err = await response.json().catch(() => null);
+                toast.error(err?.message || 'Could not update role.');
+                await this.loadUsers();
+            }
+        } catch (error) {
+            console.error('Error updating role:', error);
+            toast.error('Error updating role.');
+            await this.loadUsers();
+        }
     };
 
     loadStats = async () => {
