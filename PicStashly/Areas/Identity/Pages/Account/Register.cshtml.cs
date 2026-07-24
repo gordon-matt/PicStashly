@@ -1,13 +1,11 @@
 using System.ComponentModel.DataAnnotations;
 using Microsoft.AspNetCore.Identity;
-using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
-using PicStashly.Data;
 
 namespace PicStashly.Areas.Identity.Pages.Account;
 
 /// <summary>
-/// Self-registration for family members. New accounts are created locked (pending admin
+/// Self-registration for users. New accounts are created locked (pending admin
 /// approval) rather than signed in immediately — see the admin API's user-management
 /// endpoints (<c>api/admin/users</c>) for how an admin approves them.
 /// </summary>

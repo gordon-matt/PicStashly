@@ -39,7 +39,7 @@ public static class Constants
     /// </summary>
     public static class BootswatchThemes
     {
-        public const string Default = "darkly";
+        public const string Default = "sketchy";
 
         public static readonly IReadOnlyList<string> All =
         [

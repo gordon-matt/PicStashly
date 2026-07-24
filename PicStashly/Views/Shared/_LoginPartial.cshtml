@@ -54,7 +54,7 @@ else
             <a class="nav-link" asp-area="Identity" asp-page="/Account/Login">Login</a>
         }
     </li>
-    @* Keycloak-managed instances create family accounts in Keycloak itself, so self-registration
+    @* Keycloak-managed instances create user accounts in Keycloak itself, so self-registration
        only applies to the built-in Identity provider. *@
     @if (AuthProvider.IsIdentity)
     {

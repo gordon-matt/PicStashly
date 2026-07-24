@@ -2,7 +2,7 @@ namespace PicStashly.Services.Abstractions;
 
 /// <summary>
 /// Provider-agnostic access to the current request's authenticated user, used to scope every
-/// Category/Image/Tag query and mutation to the signed-in family member. Backed by the
+/// Category/Image/Tag query and mutation to the signed-in user. Backed by the
 /// <c>ClaimTypes.NameIdentifier</c> claim, which is the local Identity user id when using
 /// ASP.NET Core Identity, or the Keycloak "sub" claim when using Keycloak — either way it is
 /// stable across sessions and unique per user.
