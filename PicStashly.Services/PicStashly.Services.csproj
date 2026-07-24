@@ -23,18 +23,27 @@
 	</ItemGroup>
 
 	<!--
-		PaddleOCR/OpenCvSharp ship platform-specific native libraries. Reference only the ones
-		matching the build/publish host OS so Windows dev restores stay lean and the Linux Docker
-		image doesn't drag in Windows DLLs. Dev = Windows x64, Docker/prod = Linux x64.
+		PaddleOCR/OpenCvSharp ship platform-specific native libraries. Both win-x64 and linux-x64
+		are referenced unconditionally (not just on the build machine's OS) so a single build
+		produces both sets of native assets under bin/.../runtimes/{rid}/native/. This matters
+		because Visual Studio's Linux-container "fast mode" debugging doesn't do a separate
+		Linux-side build — it bind-mounts this exact Windows-built output straight into the Linux
+		container — so if linux-x64 assets were only restored when MSBuild itself runs on Linux,
+		that debugging path would never get them. The runtime picks the right one by RID at load
+		time regardless of which OS built the output.
 	-->
-	<ItemGroup Condition="$([MSBuild]::IsOSPlatform('Windows'))">
+	<ItemGroup>
 		<PackageReference Include="Sdcb.PaddleInference.runtime.win64.mkl" Version="3.3.1.70" />
 		<PackageReference Include="OpenCvSharp4.runtime.win" Version="4.13.0.20260627" />
-	</ItemGroup>
-
-	<ItemGroup Condition="$([MSBuild]::IsOSPlatform('Linux'))">
 		<PackageReference Include="Sdcb.PaddleInference.runtime.linux-x64.mkl" Version="3.3.1.70" />
-		<PackageReference Include="OpenCvSharp4.official.runtime.linux-x64" Version="4.13.0.20260627" />
+		<!--
+			The "official" OpenCvSharp4 Linux runtime is built with highgui support and drags in a
+			full GTK/X11/cairo/pango desktop stack that a headless Docker OCR service doesn't have
+			and doesn't need. Sdcb's "mini" runtime ships the same libOpenCvSharpExtern.so filename
+			(drop-in for the OpenCvSharp4 managed package) built without that GUI stack, so it only
+			needs libraries already present in the base aspnet image.
+		-->
+		<PackageReference Include="Sdcb.OpenCvSharp4.mini.runtime.linux-x64" Version="4.13.0.45" />
 	</ItemGroup>
 
 	<ItemGroup>

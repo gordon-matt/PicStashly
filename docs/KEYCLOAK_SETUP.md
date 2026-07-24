@@ -148,7 +148,7 @@ The app expects a flat `roles` claim in the token (e.g. `roles: ["Administrator"
 1. In the left sidebar, go to **Users → Create new user**.
 2. Fill in **Username** and **Email**, toggle **Email verified** on, click **Create**.
 3. On the user page, click **Credentials → Set password** (toggle **Temporary** off).
-4. Click **Role mapping → Assign role**, select `Administrator` (or `User` for a
+4. Click **Role mapping → Assign role → Realm roles**, select `Administrator` (or `User` for a
    non-admin login that can browse/upload but not see the Admin page), click **Assign**.
 
 ## Step 8 — Configure PicStashly

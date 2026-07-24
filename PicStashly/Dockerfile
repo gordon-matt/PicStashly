@@ -12,6 +12,17 @@ RUN apt-get update \
 WORKDIR /app
 EXPOSE 8080
 EXPOSE 8081
+# paddle_inference_c.so's sibling libs (libmklml_intel.so, libdnnl.so.*, libonnxruntime.so.*,
+# libpaddle2onnx.so.*, ...) are built with an RPATH that doesn't resolve when the runtime is
+# dlopen'd bare-named from the .NET host, so they fail to load unless this directory is on
+# LD_LIBRARY_PATH — this is a known Sdcb.PaddleInference Linux packaging gotcha, not optional.
+# Two candidate paths are listed because this image is used two different ways:
+#   - Normal (published) container: the "final" stage below COPYs the publish output straight
+#     into /app, so the native folder sits at /app/runtimes/linux-x64/native.
+#   - Visual Studio "fast mode" debugging of this "base" stage bind-mounts the whole PicStashly
+#     project folder onto /app as-is (no publish step), so the build output — and therefore the
+#     native folder — sits one level deeper, under /app/bin/Debug/net10.0/runtimes/linux-x64/native.
+ENV LD_LIBRARY_PATH="/app/runtimes/linux-x64/native:/app/bin/Debug/net10.0/runtimes/linux-x64/native:${LD_LIBRARY_PATH}"
 
 # Build stage — use the glibc (Noble) SDK, not Alpine: the PaddleOCR/OpenCvSharp native runtime
 # packages restored here are glibc builds (linux-x64), matching the Noble runtime image above.
