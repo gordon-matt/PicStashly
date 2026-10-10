@@ -1,4 +1,5 @@
 using System.Net;
+using LogVue;
 using Microsoft.AspNetCore.Http.Features;
 using PicStashly;
 using PicStashly.Infrastructure;
@@ -7,16 +8,18 @@ using Serilog;
 
 var builder = WebApplication.CreateBuilder(args);
 
-Log.Logger = new LoggerConfiguration()
+builder.Services.AddLogVue(options =>
+    builder.Configuration.GetSection(LogVueOptions.SectionName).Bind(options));
+
+builder.Services.AddPicStashlyDatabase(builder.Configuration);
+
+builder.Services.AddSerilog((services, configuration) => configuration
     .MinimumLevel.Information()
     .ReadFrom.Configuration(builder.Configuration)
     .Enrich.FromLogContext()
     .WriteTo.Console()
-    .CreateLogger();
+    .WriteTo.LogVue(services));
 
-builder.Host.UseSerilog();
-
-builder.Services.AddPicStashlyDatabase(builder.Configuration);
 builder.Services.AddEntityFrameworkRepository();
 builder.Services.AddPicStashlyServices(builder.Configuration);
 
@@ -123,6 +126,11 @@ if (app.Environment.IsDevelopment())
 {
     razorPages.WithStaticAssets();
 }
+
+app.MapLogVue().RequireAuthorization(new AuthorizeAttribute
+{
+    Roles = PicStashly.Constants.Roles.Administrator
+});
 
 await using (var scope = app.Services.CreateAsyncScope())
 {

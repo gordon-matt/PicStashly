@@ -7,10 +7,17 @@
 		<UserSecretsId>4f8cedf2-9307-4c1d-af60-aa26283e8ef2</UserSecretsId>
 		<DockerDefaultTargetOS>Linux</DockerDefaultTargetOS>
 		<Version>1.0.0</Version>
+		<!--
+		  LogVue's dashboard needs the framework's blazor.web.js. The Web SDK only restores that
+		  file when this property is set on the host, and package props are not imported during
+		  restore, so it has to be set here.
+		-->
+		<RequiresAspNetWebAssets>true</RequiresAspNetWebAssets>
 	</PropertyGroup>
 
 	<ItemGroup>
 		<PackageReference Include="Ardalis.Result.AspNetCore" Version="10.1.0" />
+		<PackageReference Include="LogVue" Version="1.0.0" />
 		<PackageReference Include="Microsoft.AspNetCore.Authentication.OpenIdConnect" Version="10.0.10" />
 		<PackageReference Include="Microsoft.AspNetCore.Diagnostics.EntityFrameworkCore" Version="10.0.10" />
 		<PackageReference Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" Version="10.0.10" />

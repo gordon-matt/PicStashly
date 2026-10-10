@@ -1,3 +1,4 @@
+using LogVue.Data.Npgsql;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -31,6 +32,11 @@ public static class ServiceCollectionExtensions
 
             services.AddScoped<ApplicationDbContextBase>(sp => sp.GetRequiredService<ApplicationDbContext>());
             services.AddSingleton<IDbContextFactory, ApplicationDbContextFactory>();
+
+            if (!string.IsNullOrWhiteSpace(connectionString))
+            {
+                services.AddLogVueNpgsql(connectionString);
+            }
 
             return services;
         }
