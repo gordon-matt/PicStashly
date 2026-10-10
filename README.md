@@ -4,6 +4,22 @@ A self-hosted web app for storing, tagging, and finding random images — memes,
 screenshots — optimized for fast capture and search rather than chronological photo organization.
 Think of it as a personal visual search engine, not a photo manager.
 
+## Screenshots
+
+### Library (Home Page):
+
+<img src="https://github.com/gordon-matt/PicStashly/blob/master/_Misc/Screenshots/Home.png" alt="Home" />
+
+### Admin:
+
+<img src="https://github.com/gordon-matt/PicStashly/blob/master/_Misc/Screenshots/Admin.png" alt="Home" />
+
+### Capturing an image with the bookmarklet:
+
+<img src="https://github.com/gordon-matt/PicStashly/blob/master/_Misc/Screenshots/Bookmarklet Capture.png" alt="Home" />
+
+You drag the bookmarklet from the admin page to your bookmarks toolbar first. Then when you hit that bookmarklet on any page, you can capture an image. The image under the cursor will be highlighted as well. In the screenshot above, you can see the Rambo meme is highlighted because my cursor was over it.
+
 ## Features
 
 - **Multi-user**: built for a family (or household) to share one instance while keeping libraries
