@@ -1,4 +1,4 @@
-# PicStashly
+<img src="https://github.com/gordon-matt/PicStashly/blob/master/_Misc/Logo.png" alt="Logo" width="300" />
 
 A self-hosted web app for storing, tagging, and finding random images — memes, reaction images,
 screenshots — optimized for fast capture and search rather than chronological photo organization.
