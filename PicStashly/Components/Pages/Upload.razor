@@ -1,0 +1,392 @@
+@page "/upload"
+@attribute [Authorize]
+@implements IAsyncDisposable
+@inject IImageService Images
+@inject ITagService TagService
+@inject ICategoryService CategoryService
+@inject ToastService Toasts
+@inject IJSRuntime Js
+
+<PageTitle>Upload</PageTitle>
+
+<div class="container">
+    <PageHeader Title="Upload" Icon="cloud-arrow-up" Description="Drop files anywhere, paste from clipboard, or click to browse" />
+
+    <label id="dropZone" class="drop-zone mb-3 d-block">
+        <i class="bi bi-cloud-arrow-up display-4 d-block mb-2"></i>
+        <p class="mb-1">Drag &amp; drop images here, or click to browse</p>
+        <p class="text-muted small mb-0">You can also paste an image anywhere on this page (Ctrl+V)</p>
+        <InputFile id="upload-files" class="d-none" OnChange="OnFilesSelected" multiple accept="image/*" />
+    </label>
+
+    <datalist id="upload-tag-suggestions">
+        @foreach (var name in tagNames)
+        {
+            <option value="@name"></option>
+        }
+    </datalist>
+
+    <div class="row g-2 mb-4 align-items-center">
+        <div class="col-auto">
+            <label class="col-form-label" for="batchTags">Batch tags:</label>
+        </div>
+        <div class="col">
+            <input id="batchTags" class="form-control" list="upload-tag-suggestions"
+                   placeholder="Tags applied to every image in this batch..."
+                   @bind="batchTags" @bind:event="oninput" />
+        </div>
+        <div class="col-auto">
+            <label class="col-form-label" for="batchCategory">Category:</label>
+        </div>
+        <div class="col-auto">
+            <select id="batchCategory" class="form-select" @bind="selectedCategoryId">
+                <option value="">None</option>
+                @foreach (var category in categories)
+                {
+                    <option value="@category.Id">@category.Name</option>
+                }
+            </select>
+        </div>
+    </div>
+
+    <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-3">
+        @foreach (var item in queue)
+        {
+            <div class="col">
+                <div class="card h-100">
+                    @if (item.PreviewUrl is not null)
+                    {
+                        <img class="upload-card-thumb card-img-top" src="@item.PreviewUrl" alt="" />
+                    }
+                    else
+                    {
+                        <div class="upload-card-thumb card-img-top d-flex align-items-center justify-content-center">
+                            <i class="bi bi-image display-6 text-muted"></i>
+                        </div>
+                    }
+                    <div class="card-body p-2">
+                        <p class="card-text small fw-semibold text-truncate mb-1">@item.FileName</p>
+                        @if (item.Status == "pending")
+                        {
+                            <div class="text-muted small"><i class="bi bi-hourglass"></i> Waiting...</div>
+                        }
+                        else if (item.Status == "uploading")
+                        {
+                            <div class="text-muted small"><span class="spinner-border spinner-border-sm"></span> Uploading...</div>
+                        }
+                        else if (item.Status == "saved")
+                        {
+                            <div class="text-success small"><i class="bi bi-check-circle"></i> Saved</div>
+                            <div class="mt-2">
+                                <input class="form-control form-control-sm mb-2" list="upload-tag-suggestions"
+                                       placeholder="Tags for this image..."
+                                       @bind="item.TagsText" @bind:event="oninput" @onblur="() => SaveItemTags(item)" />
+                                <label class="form-label small fw-semibold d-flex justify-content-between align-items-center mb-1">
+                                    Extracted text
+                                    <button type="button" class="btn btn-sm btn-outline-primary py-0" disabled="@(!item.OcrDirty)" @onclick="() => SaveOcr(item)">
+                                        <i class="bi bi-save"></i> Save
+                                    </button>
+                                </label>
+                                <textarea class="form-control form-control-sm" rows="3"
+                                          placeholder="No text extracted — correct or add it here"
+                                          @bind="item.OcrText" @bind:event="oninput"></textarea>
+                            </div>
+                        }
+                        else if (item.Status == "error")
+                        {
+                            <div class="text-danger small"><i class="bi bi-exclamation-triangle"></i> @item.Error</div>
+                        }
+                        else if (item.Status == "duplicate")
+                        {
+                            <div class="mt-1">
+                                <div class="alert alert-warning py-2 px-2 small mb-2">
+                                    <i class="bi bi-exclamation-triangle me-1"></i>
+                                    You already have something similar:
+                                </div>
+                                <div class="d-flex flex-wrap gap-2 mb-2">
+                                    @foreach (var match in item.Duplicates)
+                                    {
+                                        <a href="@($"/image/{match.Id}")" target="_blank" title="@($"{match.FileName} (distance {match.Distance})")" rel="noopener">
+                                            <img class="dedup-thumb" src="@match.ThumbnailUrl" alt="" />
+                                        </a>
+                                    }
+                                </div>
+                                <div class="d-flex flex-wrap gap-2">
+                                    <button type="button" class="btn btn-sm btn-primary" @onclick="() => SaveAnyway(item)">Save anyway</button>
+                                    <button type="button" class="btn btn-sm btn-outline-secondary" disabled="@(UiFormat.ParseTags(batchTags).Count == 0)"
+                                            title="Applies the batch tags typed above onto the existing image"
+                                            @onclick="() => MergeBatchTags(item)">
+                                        Add batch tags to existing
+                                    </button>
+                                    <button type="button" class="btn btn-sm btn-outline-danger" @onclick="() => Discard(item)">Discard</button>
+                                </div>
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+
+    @if (queue.Count > 0)
+    {
+        <div class="mt-4 d-flex gap-2">
+            <a href="/" class="btn btn-outline-primary"><i class="bi bi-grid-3x3-gap"></i> Go to Library</a>
+            <button type="button" class="btn btn-outline-secondary" @onclick="ClearFinished">Clear finished</button>
+        </div>
+    }
+</div>
+
+@code {
+    private const long MaxUploadBytes = 52_428_800;
+    private const int PreviewByteLimit = 4_000_000;
+
+    private readonly List<UploadItem> queue = [];
+    private List<CategoryItem> categories = [];
+    private List<string> tagNames = [];
+    private string batchTags = string.Empty;
+    private string selectedCategoryId = string.Empty;
+    private bool processing;
+    private int nextId = 1;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var categoryResult = await CategoryService.GetCategoriesAsync();
+        if (categoryResult.IsSuccess)
+        {
+            categories = categoryResult.Value;
+        }
+
+        var tagResult = await TagService.GetTagsAsync();
+        if (tagResult.IsSuccess)
+        {
+            tagNames = tagResult.Value.Select(tag => tag.Name).OrderBy(name => name).ToList();
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender)
+        {
+            return;
+        }
+
+        await Js.InvokeVoidAsync("picstashly.bindDropZone", "upload-zone", "dropZone", "upload-files");
+        await Js.InvokeVoidAsync("picstashly.bindPageDrop", "upload-page", "upload-files");
+    }
+
+    private async Task OnFilesSelected(InputFileChangeEventArgs args)
+    {
+        foreach (IBrowserFile file in args.GetMultipleFiles(100))
+        {
+            var item = new UploadItem
+            {
+                Id = nextId++,
+                FileName = string.IsNullOrWhiteSpace(file.Name) ? "pasted-image.png" : file.Name,
+            };
+
+            try
+            {
+                await using var read = file.OpenReadStream(MaxUploadBytes);
+                await read.CopyToAsync(item.Content);
+                if (item.Content.Length <= PreviewByteLimit)
+                {
+                    string contentType = string.IsNullOrWhiteSpace(file.ContentType) ? "image/png" : file.ContentType;
+                    item.PreviewUrl = $"data:{contentType};base64,{Convert.ToBase64String(item.Content.ToArray())}";
+                }
+            }
+            catch (Exception)
+            {
+                item.Status = "error";
+                item.Error = "Could not read that file.";
+            }
+
+            queue.Add(item);
+        }
+
+        await ProcessQueue();
+    }
+
+    private async Task ProcessQueue()
+    {
+        if (processing)
+        {
+            return;
+        }
+
+        processing = true;
+        try
+        {
+            while (queue.FirstOrDefault(item => item.Status == "pending") is { } item)
+            {
+                await UploadItemAsync(item, force: false);
+            }
+        }
+        finally
+        {
+            processing = false;
+        }
+    }
+
+    private async Task UploadItemAsync(UploadItem item, bool force)
+    {
+        item.Status = "uploading";
+        item.Error = null;
+        StateHasChanged();
+
+        int? categoryId = int.TryParse(selectedCategoryId, out int parsed) ? parsed : null;
+        List<string> tags = UiFormat.ParseTags(batchTags);
+        item.Content.Position = 0;
+
+        var result = await Images.IngestAsync(
+            item.Content,
+            item.FileName,
+            sourceUrl: null,
+            tagNames: tags.Count == 0 ? null : tags,
+            categoryId,
+            force);
+
+        if (!result.IsSuccess)
+        {
+            item.Status = "error";
+            item.Error = result.Errors.FirstOrDefault() ?? "Upload failed.";
+            StateHasChanged();
+            return;
+        }
+
+        if (result.Value.IsDuplicate)
+        {
+            item.Duplicates = result.Value.Duplicates;
+            item.Status = "duplicate";
+            StateHasChanged();
+            return;
+        }
+
+        item.Saved = result.Value.Image;
+        item.OcrText = result.Value.Image?.OcrText ?? string.Empty;
+        item.SavedOcr = item.OcrText;
+        item.TagsText = UiFormat.JoinTags(result.Value.Image?.Tags);
+        item.Status = "saved";
+        StateHasChanged();
+    }
+
+    private Task SaveAnyway(UploadItem item) => UploadItemAsync(item, force: true);
+
+    private async Task MergeBatchTags(UploadItem item)
+    {
+        List<string> tags = UiFormat.ParseTags(batchTags);
+        DuplicateMatch? target = item.Duplicates.FirstOrDefault();
+        if (target is null || tags.Count == 0)
+        {
+            Discard(item);
+            return;
+        }
+
+        var result = await Images.BulkTagAsync(new BulkTagRequest([target.Id], tags));
+        if (!result.IsSuccess)
+        {
+            Toasts.ShowFailure(result);
+            return;
+        }
+
+        Toasts.Success($"Tags merged into \"{target.FileName}\".");
+        Discard(item);
+    }
+
+    private async Task SaveItemTags(UploadItem item)
+    {
+        if (item.Saved is null)
+        {
+            return;
+        }
+
+        List<string> names = UiFormat.ParseTags(item.TagsText);
+        var result = await Images.SetTagsAsync(item.Saved.Id, new SetImageTagsRequest(names));
+        if (!result.IsSuccess)
+        {
+            Toasts.ShowFailure(result);
+            return;
+        }
+
+        item.Saved = item.Saved with { Tags = result.Value };
+        item.TagsText = UiFormat.JoinTags(result.Value);
+    }
+
+    private async Task SaveOcr(UploadItem item)
+    {
+        if (item.Saved is null)
+        {
+            return;
+        }
+
+        var result = await Images.UpdateOcrTextAsync(item.Saved.Id, new UpdateOcrTextRequest(item.OcrText));
+        if (!result.IsSuccess)
+        {
+            Toasts.ShowFailure(result);
+            return;
+        }
+
+        item.SavedOcr = item.OcrText;
+        item.Saved = item.Saved with { OcrText = item.OcrText };
+        Toasts.Success("Text updated.");
+    }
+
+    private void Discard(UploadItem item)
+    {
+        item.Content.Dispose();
+        queue.Remove(item);
+    }
+
+    private void ClearFinished()
+    {
+        foreach (var item in queue.Where(item => item.Status is "saved" or "error").ToList())
+        {
+            Discard(item);
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        foreach (var item in queue)
+        {
+            item.Content.Dispose();
+        }
+
+        try
+        {
+            await Js.InvokeVoidAsync("picstashly.unbind", "upload-zone");
+            await Js.InvokeVoidAsync("picstashly.unbind", "upload-page");
+        }
+        catch (Exception ex) when (ex is JSDisconnectedException or InvalidOperationException)
+        {
+            // The prerender pass has no circuit, and a closed circuit can no longer run script.
+        }
+    }
+
+    private sealed class UploadItem
+    {
+        public int Id { get; init; }
+
+        public string FileName { get; init; } = string.Empty;
+
+        public MemoryStream Content { get; } = new();
+
+        public string? PreviewUrl { get; set; }
+
+        public string Status { get; set; } = "pending";
+
+        public string? Error { get; set; }
+
+        public List<DuplicateMatch> Duplicates { get; set; } = [];
+
+        public ImageDetail? Saved { get; set; }
+
+        public string OcrText { get; set; } = string.Empty;
+
+        public string SavedOcr { get; set; } = string.Empty;
+
+        public string TagsText { get; set; } = string.Empty;
+
+        public bool OcrDirty => OcrText != SavedOcr;
+    }
+}

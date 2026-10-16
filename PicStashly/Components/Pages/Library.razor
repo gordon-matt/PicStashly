@@ -1,0 +1,744 @@
+@page "/"
+@attribute [Authorize]
+@implements IAsyncDisposable
+@inject IImageService Images
+@inject ITagService TagService
+@inject ICategoryService CategoryService
+@inject DialogService Dialogs
+@inject ToastService Toasts
+@inject IJSRuntime Js
+
+<PageTitle>Library</PageTitle>
+
+<datalist id="library-tag-suggestions">
+    @foreach (var name in tagNames)
+    {
+        <option value="@name"></option>
+    }
+</datalist>
+
+<div class="filter-bar">
+    <div class="row g-2 align-items-center">
+        <div class="col-12 col-md-2">
+            <input type="text" class="form-control" placeholder="Search filename, tags, text..."
+                   value="@searchQuery" @oninput="OnSearchInput" />
+        </div>
+        <div class="col-12 col-md-2">
+            <input type="text" class="form-control" placeholder="Filter by tags..." list="library-tag-suggestions"
+                   value="@tagFilter" @oninput="OnTagFilterInput" />
+        </div>
+        <div class="col-6 col-md-2">
+            <select class="form-select" @onchange="OnCategoryFilter">
+                <option value="" selected="@(categoryId is null)">All categories</option>
+                @foreach (var category in categories)
+                {
+                    <option value="@category.Id" selected="@(categoryId == category.Id)">@category.Name</option>
+                }
+            </select>
+        </div>
+        <div class="col-6 col-md-2">
+            <select class="form-select" @onchange="OnSortChanged">
+                <option value="newest" selected="@(sort == "newest")">Newest first</option>
+                <option value="oldest" selected="@(sort == "oldest")">Oldest first</option>
+                <option value="random" selected="@(sort == "random")">Random shuffle</option>
+            </select>
+        </div>
+        <div class="col-6 col-md-2">
+            <div class="form-check form-switch">
+                <input class="form-check-input" type="checkbox" id="untaggedToggle" checked="@untaggedOnly" @onchange="OnUntaggedChanged" />
+                <label class="form-check-label" for="untaggedToggle">Untagged only</label>
+            </div>
+        </div>
+        <div class="col-6 col-md-2 d-flex gap-2 justify-content-md-end">
+            <button type="button" class="btn btn-outline-secondary" title="Clear filters" @onclick="ClearFilters">
+                <i class="bi bi-x-circle"></i>
+            </button>
+            <button type="button" class="btn @(selectionMode ? "btn-primary" : "btn-outline-secondary")"
+                    title="Select multiple images for bulk tagging" @onclick="() => selectionMode = !selectionMode">
+                <i class="bi bi-check2-square"></i>
+            </button>
+            <a href="/upload" class="btn btn-primary text-nowrap">
+                <i class="bi bi-cloud-arrow-up"></i> Upload
+            </a>
+        </div>
+    </div>
+
+    @if (selectionMode)
+    {
+        <div class="row g-2 mt-1 align-items-center">
+            <div class="col-auto">
+                <span class="badge bg-primary">@selected.Count selected</span>
+            </div>
+            <div class="col-12 col-md-4">
+                <input class="form-control form-control-sm" placeholder="Tags to apply/remove..." list="library-tag-suggestions"
+                       @bind="bulkTags" @bind:event="oninput" />
+            </div>
+            <div class="col-auto">
+                <button type="button" class="btn btn-sm btn-success" disabled="@(!CanBulkTag)" @onclick="() => BulkTag(false)">
+                    <i class="bi bi-plus-lg"></i> Apply tags
+                </button>
+                <button type="button" class="btn btn-sm btn-outline-danger" disabled="@(!CanBulkTag)" @onclick="() => BulkTag(true)">
+                    <i class="bi bi-dash-lg"></i> Remove tags
+                </button>
+                <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="SelectAllVisible">Select all</button>
+                <button type="button" class="btn btn-sm btn-outline-secondary" @onclick="selected.Clear">Clear</button>
+            </div>
+        </div>
+    }
+</div>
+
+@if (!loading && items.Count == 0)
+{
+    <div class="alert alert-info">
+        <i class="bi bi-info-circle me-2"></i>
+        @if (HasActiveFilters)
+        {
+            <span>No images match the current filters — try removing some.</span>
+        }
+        else
+        {
+            <span>Your library is empty. <a href="/upload">Upload some images</a> to get started.</span>
+        }
+    </div>
+}
+
+<div class="masonry-grid">
+    @foreach (var image in items)
+    {
+        <div class="masonry-item @(selected.Contains(image.Id) ? "selected" : null)" @onclick="() => OnItemClick(image)">
+            @if (selectionMode)
+            {
+                <input type="checkbox" class="form-check-input select-check" checked="@selected.Contains(image.Id)"
+                       @onclick:stopPropagation="true" @onchange="() => ToggleSelected(image.Id)" />
+            }
+            else
+            {
+                <button type="button" class="btn btn-sm btn-secondary item-copy" title="Copy image"
+                        @onclick="() => CopyImage(image.Url)" @onclick:stopPropagation="true">
+                    <i class="bi bi-clipboard"></i>
+                </button>
+                <button type="button" class="btn btn-sm btn-secondary item-edit-tags" title="Edit tags"
+                        @onclick="() => OpenLightbox(image, focusTagBox: true)" @onclick:stopPropagation="true">
+                    <i class="bi bi-pencil"></i>
+                </button>
+                <button type="button" class="btn btn-sm btn-danger item-delete" title="Delete"
+                        @onclick="() => DeleteImage(image, fromLightbox: false)" @onclick:stopPropagation="true">
+                    <i class="bi bi-trash"></i>
+                </button>
+            }
+            <img loading="lazy" src="@image.ThumbnailUrl" alt="@image.FileName" />
+            <div class="item-tags">
+                @foreach (var tag in image.Tags)
+                {
+                    <span class="badge rounded-pill bg-dark border me-1 mb-1">@tag</span>
+                }
+            </div>
+        </div>
+    }
+</div>
+
+<div @ref="sentinel"></div>
+@if (loading)
+{
+    <div class="text-center py-4">
+        <div class="spinner-border" role="status"><span class="visually-hidden">Loading...</span></div>
+    </div>
+}
+else if (hasMore)
+{
+    <div class="text-center py-3">
+        <button type="button" class="btn btn-outline-secondary" @onclick="LoadMore">Load more</button>
+    </div>
+}
+else if (items.Count > 0)
+{
+    <div class="text-center text-muted py-3">@totalCount image(s)</div>
+}
+
+<InputFile id="library-files" class="d-none" OnChange="OnQuickUpload" multiple accept="image/*" />
+
+@if (lightbox is not null)
+{
+    <div class="lightbox-backdrop" tabindex="-1" @ref="lightboxRoot" @onkeydown="OnLightboxKey">
+        <div class="lightbox-nav prev" @onclick="() => StepLightbox(-1)"><i class="bi bi-chevron-left"></i></div>
+        <div class="lightbox-nav next" @onclick="() => StepLightbox(1)"><i class="bi bi-chevron-right"></i></div>
+        <div class="lightbox-image-wrap" @onclick="CloseLightbox">
+            <img src="@lightbox.Url" alt="@lightbox.FileName" @onclick:stopPropagation="true" />
+        </div>
+        <div class="lightbox-toolbar">
+            <input @ref="tagInput" class="form-control form-control-sm lightbox-tags-input" placeholder="Tags... (press t to focus)"
+                   list="library-tag-suggestions" @bind="lightboxTags" @bind:event="oninput"
+                   @onblur="SaveLightboxTags" @onkeydown:stopPropagation="true" />
+            <select class="form-select form-select-sm lightbox-category-select" @onchange="OnLightboxCategory">
+                <option value="" selected="@(lightbox.CategoryId is null)">No category</option>
+                @foreach (var category in categories)
+                {
+                    <option value="@category.Id" selected="@(lightbox.CategoryId == category.Id)">@category.Name</option>
+                }
+            </select>
+            <span class="text-light small flex-grow-1 text-truncate">@lightbox.FileName</span>
+            <a class="btn btn-sm btn-outline-light" href="@($"/image/{lightbox.Id}")" title="Details">
+                <i class="bi bi-info-circle"></i>
+            </a>
+            <button type="button" class="btn btn-sm btn-outline-light" title="Copy image to clipboard" @onclick="() => CopyImage(lightbox.Url)">
+                <i class="bi bi-clipboard"></i>
+            </button>
+            <a class="btn btn-sm btn-outline-light" href="@lightbox.Url" download="@lightbox.FileName" title="Download">
+                <i class="bi bi-download"></i>
+            </a>
+            <button type="button" class="btn btn-sm btn-outline-danger" title="Delete (Del)" @onclick="() => DeleteImage(lightbox, fromLightbox: true)">
+                <i class="bi bi-trash"></i>
+            </button>
+            <button type="button" class="btn btn-sm btn-outline-light" title="Close (Esc)" @onclick="CloseLightbox">
+                <i class="bi bi-x-lg"></i>
+            </button>
+        </div>
+    </div>
+}
+
+@code {
+    private const long MaxUploadBytes = 52_428_800;
+
+    private readonly List<ImageListItem> items = [];
+    private readonly HashSet<int> selected = [];
+    private List<CategoryItem> categories = [];
+    private List<string> tagNames = [];
+
+    private string searchQuery = string.Empty;
+    private string tagFilter = string.Empty;
+    private string bulkTags = string.Empty;
+    private string lightboxTags = string.Empty;
+    private string sort = "newest";
+    private int? categoryId;
+    private bool untaggedOnly;
+    private bool selectionMode;
+    private bool loading = true;
+    private bool hasMore;
+    private int page = 1;
+    private int totalCount;
+    private int shuffleSeed;
+    private int searchGeneration;
+    private bool filtersReady;
+    private bool focusTagBox;
+    private bool focusLightbox;
+    private ImageListItem? lightbox;
+    private ElementReference sentinel;
+    private ElementReference lightboxRoot;
+    private ElementReference tagInput;
+    private DotNetObjectReference<Library>? self;
+
+    [SupplyParameterFromQuery(Name = "tags")]
+    public string? TagsQuery { get; set; }
+
+    [SupplyParameterFromQuery(Name = "categoryId")]
+    public int? CategoryQuery { get; set; }
+
+    private string? appliedTagsQuery;
+    private int? appliedCategoryQuery;
+    private bool parametersApplied;
+
+    private bool HasActiveFilters =>
+        !string.IsNullOrWhiteSpace(searchQuery)
+        || !string.IsNullOrWhiteSpace(tagFilter)
+        || categoryId is not null
+        || untaggedOnly
+        || sort != "newest";
+
+    private bool CanBulkTag => selected.Count > 0 && UiFormat.ParseTags(bulkTags).Count > 0;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        bool queryChanged = !parametersApplied
+            || !string.Equals(TagsQuery, appliedTagsQuery, StringComparison.Ordinal)
+            || CategoryQuery != appliedCategoryQuery;
+        if (!queryChanged)
+        {
+            return;
+        }
+
+        parametersApplied = true;
+        appliedTagsQuery = TagsQuery;
+        appliedCategoryQuery = CategoryQuery;
+        if (!string.IsNullOrWhiteSpace(TagsQuery))
+        {
+            tagFilter = TagsQuery;
+        }
+
+        if (CategoryQuery is not null)
+        {
+            categoryId = CategoryQuery;
+        }
+
+        await Reload();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            self = DotNetObjectReference.Create(this);
+            await Js.InvokeVoidAsync("picstashly.bindPageDrop", "library", "library-files");
+            await Js.InvokeVoidAsync("picstashly.watchSentinel", sentinel, self);
+        }
+
+        if (focusTagBox)
+        {
+            focusTagBox = false;
+            await Js.InvokeVoidAsync("picstashly.focus", tagInput);
+        }
+        else if (focusLightbox)
+        {
+            focusLightbox = false;
+            await Js.InvokeVoidAsync("picstashly.focus", lightboxRoot);
+        }
+    }
+
+    private async Task OnSearchInput(ChangeEventArgs e)
+    {
+        searchQuery = e.Value?.ToString() ?? string.Empty;
+        int generation = ++searchGeneration;
+        await Task.Delay(300);
+        if (generation == searchGeneration)
+        {
+            await Reload();
+        }
+    }
+
+    private async Task OnTagFilterInput(ChangeEventArgs e)
+    {
+        tagFilter = e.Value?.ToString() ?? string.Empty;
+        int generation = ++searchGeneration;
+        await Task.Delay(300);
+        if (generation == searchGeneration)
+        {
+            await Reload();
+        }
+    }
+
+    private async Task OnCategoryFilter(ChangeEventArgs e)
+    {
+        categoryId = int.TryParse(e.Value?.ToString(), out int id) ? id : null;
+        await Reload();
+    }
+
+    private async Task OnSortChanged(ChangeEventArgs e)
+    {
+        sort = e.Value?.ToString() ?? "newest";
+        shuffleSeed = sort == "random" ? Random.Shared.Next(1, int.MaxValue) : 0;
+        await Reload();
+    }
+
+    private async Task OnUntaggedChanged(ChangeEventArgs e)
+    {
+        untaggedOnly = e.Value is true;
+        await Reload();
+    }
+
+    private async Task ClearFilters()
+    {
+        searchQuery = string.Empty;
+        tagFilter = string.Empty;
+        categoryId = null;
+        untaggedOnly = false;
+        sort = "newest";
+        shuffleSeed = 0;
+        await Reload();
+    }
+
+    private async Task Reload()
+    {
+        page = 1;
+        loading = true;
+        await EnsureFilters();
+        var result = await Images.SearchAsync(BuildRequest(page));
+        loading = false;
+        if (!result.IsSuccess)
+        {
+            Toasts.ShowFailure(result);
+            return;
+        }
+
+        items.Clear();
+        items.AddRange(result.Value.Images);
+        totalCount = result.Value.TotalCount;
+        hasMore = result.Value.Page < result.Value.TotalPages;
+        int? openId = lightbox?.Id;
+        lightbox = openId is int id ? items.FirstOrDefault(item => item.Id == id) : lightbox;
+        if (lightbox is null)
+        {
+            lightboxTags = string.Empty;
+        }
+    }
+
+    [JSInvokable]
+    public async Task LoadMoreFromScroll()
+    {
+        if (!loading && hasMore)
+        {
+            await LoadMore();
+        }
+    }
+
+    private async Task LoadMore()
+    {
+        if (loading || !hasMore)
+        {
+            return;
+        }
+
+        loading = true;
+        int nextPage = page + 1;
+        var result = await Images.SearchAsync(BuildRequest(nextPage));
+        loading = false;
+        if (!result.IsSuccess)
+        {
+            Toasts.ShowFailure(result);
+            return;
+        }
+
+        page = nextPage;
+        items.AddRange(result.Value.Images);
+        totalCount = result.Value.TotalCount;
+        hasMore = result.Value.Page < result.Value.TotalPages;
+    }
+
+    private ImageSearchRequest BuildRequest(int pageNumber) => new(
+        Page: pageNumber,
+        Search: string.IsNullOrWhiteSpace(searchQuery) ? null : searchQuery.Trim(),
+        Tags: string.IsNullOrWhiteSpace(tagFilter) ? null : tagFilter.Trim(),
+        CategoryId: categoryId,
+        UntaggedOnly: untaggedOnly,
+        Sort: sort,
+        ShuffleSeed: shuffleSeed);
+
+    private async Task EnsureFilters()
+    {
+        if (filtersReady)
+        {
+            return;
+        }
+
+        var categoryResult = await CategoryService.GetCategoriesAsync();
+        if (categoryResult.IsSuccess)
+        {
+            categories = categoryResult.Value;
+        }
+
+        var tagResult = await TagService.GetTagsAsync();
+        if (tagResult.IsSuccess)
+        {
+            tagNames = tagResult.Value.Select(tag => tag.Name).OrderBy(name => name).ToList();
+        }
+
+        filtersReady = true;
+    }
+
+    private void OnItemClick(ImageListItem image)
+    {
+        if (selectionMode)
+        {
+            ToggleSelected(image.Id);
+            return;
+        }
+
+        OpenLightbox(image, focusTagBox: false);
+    }
+
+    private void ToggleSelected(int id)
+    {
+        if (!selected.Add(id))
+        {
+            selected.Remove(id);
+        }
+    }
+
+    private void SelectAllVisible()
+    {
+        foreach (var image in items)
+        {
+            selected.Add(image.Id);
+        }
+    }
+
+    private void OpenLightbox(ImageListItem image, bool focusTagBox)
+    {
+        lightbox = image;
+        lightboxTags = UiFormat.JoinTags(image.Tags);
+        this.focusTagBox = focusTagBox;
+        focusLightbox = !focusTagBox;
+    }
+
+    private void CloseLightbox()
+    {
+        lightbox = null;
+        lightboxTags = string.Empty;
+    }
+
+    private async Task StepLightbox(int direction)
+    {
+        if (lightbox is null)
+        {
+            return;
+        }
+
+        int index = items.FindIndex(item => item.Id == lightbox.Id);
+        int nextIndex = index + direction;
+        if (nextIndex < 0 || nextIndex >= items.Count)
+        {
+            return;
+        }
+
+        OpenLightbox(items[nextIndex], focusTagBox: false);
+        if (nextIndex >= items.Count - 5 && hasMore && !loading)
+        {
+            await LoadMore();
+        }
+    }
+
+    private async Task OnLightboxKey(KeyboardEventArgs e)
+    {
+        if (lightbox is null)
+        {
+            return;
+        }
+
+        switch (e.Key)
+        {
+            case "Escape":
+                CloseLightbox();
+                break;
+            case "ArrowLeft":
+                await StepLightbox(-1);
+                break;
+            case "ArrowRight":
+                await StepLightbox(1);
+                break;
+            case "Delete":
+                await DeleteImage(lightbox, fromLightbox: true);
+                break;
+            case "t":
+            case "T":
+                focusTagBox = true;
+                break;
+        }
+    }
+
+    private async Task SaveLightboxTags()
+    {
+        if (lightbox is null)
+        {
+            return;
+        }
+
+        var names = UiFormat.ParseTags(lightboxTags);
+        if (names.SequenceEqual(lightbox.Tags, StringComparer.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        var result = await Images.SetTagsAsync(lightbox.Id, new SetImageTagsRequest(names));
+        if (!result.IsSuccess)
+        {
+            Toasts.ShowFailure(result);
+            return;
+        }
+
+        Replace(lightbox with { Tags = result.Value });
+    }
+
+    private async Task OnLightboxCategory(ChangeEventArgs e)
+    {
+        if (lightbox is null)
+        {
+            return;
+        }
+
+        int? nextCategory = int.TryParse(e.Value?.ToString(), out int id) ? id : null;
+        if (nextCategory == lightbox.CategoryId)
+        {
+            return;
+        }
+
+        var result = await Images.SetCategoryAsync(lightbox.Id, new SetImageCategoryRequest(nextCategory));
+        if (!result.IsSuccess)
+        {
+            Toasts.ShowFailure(result);
+            return;
+        }
+
+        ImageDetail detail = result.Value;
+        Replace(lightbox with
+        {
+            Url = detail.Url,
+            ThumbnailUrl = detail.ThumbnailUrl,
+            FileName = detail.FileName,
+            Tags = detail.Tags,
+            CategoryId = detail.CategoryId,
+            CategoryName = detail.CategoryName,
+        });
+        Toasts.Success("Category updated.");
+    }
+
+    private async Task DeleteImage(ImageListItem image, bool fromLightbox)
+    {
+        bool confirmed = await Dialogs.ConfirmAsync(
+            "Delete image",
+            $"Delete \"{image.FileName}\"? This cannot be undone.",
+            "Delete",
+            isDestructive: true);
+        if (!confirmed)
+        {
+            return;
+        }
+
+        var result = await Images.DeleteAsync(image.Id);
+        if (!result.IsSuccess)
+        {
+            Toasts.ShowFailure(result);
+            return;
+        }
+
+        int index = items.FindIndex(item => item.Id == image.Id);
+        items.RemoveAll(item => item.Id == image.Id);
+        selected.Remove(image.Id);
+        totalCount = Math.Max(0, totalCount - 1);
+        Toasts.Success("Image deleted.");
+
+        if (!fromLightbox || lightbox?.Id != image.Id)
+        {
+            return;
+        }
+
+        if (items.Count == 0)
+        {
+            CloseLightbox();
+            return;
+        }
+
+        int nextIndex = Math.Clamp(index, 0, items.Count - 1);
+        OpenLightbox(items[nextIndex], focusTagBox: false);
+    }
+
+    private async Task CopyImage(string url)
+    {
+        try
+        {
+            await Js.InvokeVoidAsync("picstashly.copyImage", url);
+            Toasts.Success("Image copied to clipboard.");
+        }
+        catch (JSException ex)
+        {
+            Toasts.Error(string.IsNullOrWhiteSpace(ex.Message) ? "Failed to copy image." : ex.Message);
+        }
+    }
+
+    private async Task BulkTag(bool remove)
+    {
+        List<string> names = UiFormat.ParseTags(bulkTags);
+        if (selected.Count == 0 || names.Count == 0)
+        {
+            return;
+        }
+
+        var result = await Images.BulkTagAsync(new BulkTagRequest([.. selected], names, remove));
+        if (!result.IsSuccess)
+        {
+            Toasts.ShowFailure(result);
+            return;
+        }
+
+        Toasts.Success(remove ? "Tags removed." : "Tags applied.");
+        selected.Clear();
+        await Reload();
+    }
+
+    private async Task OnQuickUpload(InputFileChangeEventArgs args)
+    {
+        foreach (IBrowserFile file in args.GetMultipleFiles(100))
+        {
+            string name = string.IsNullOrWhiteSpace(file.Name) ? "pasted-image.png" : file.Name;
+            try
+            {
+                using var buffer = new MemoryStream();
+                await using var read = file.OpenReadStream(MaxUploadBytes);
+                await read.CopyToAsync(buffer);
+
+                var result = await Ingest(buffer, name, force: false);
+                if (result is null)
+                {
+                    continue;
+                }
+
+                if (result.IsDuplicate)
+                {
+                    bool saveAnyway = await Dialogs.ConfirmAsync(
+                        "Possible duplicate",
+                        $"\"{name}\" looks like a duplicate of an existing image ({result.Duplicates.Count} match(es)). Save anyway?",
+                        "Save anyway");
+                    if (!saveAnyway)
+                    {
+                        continue;
+                    }
+
+                    result = await Ingest(buffer, name, force: true);
+                    if (result is null || result.IsDuplicate)
+                    {
+                        continue;
+                    }
+                }
+
+                if (result.Image is not null)
+                {
+                    Toasts.Success($"Saved \"{result.Image.FileName}\".");
+                }
+            }
+            catch (Exception)
+            {
+                Toasts.Error($"Failed to upload \"{name}\".");
+            }
+        }
+
+        await Reload();
+    }
+
+    private async Task<IngestResult?> Ingest(MemoryStream buffer, string name, bool force)
+    {
+        buffer.Position = 0;
+        var result = await Images.IngestAsync(buffer, name, sourceUrl: null, tagNames: null, categoryId: null, force);
+        if (!result.IsSuccess)
+        {
+            Toasts.ShowFailure(result);
+            return null;
+        }
+
+        return result.Value;
+    }
+
+    private void Replace(ImageListItem updated)
+    {
+        int index = items.FindIndex(item => item.Id == updated.Id);
+        if (index >= 0)
+        {
+            items[index] = updated;
+        }
+
+        if (lightbox?.Id == updated.Id)
+        {
+            lightbox = updated;
+            lightboxTags = UiFormat.JoinTags(updated.Tags);
+        }
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        self?.Dispose();
+        try
+        {
+            await Js.InvokeVoidAsync("picstashly.unbind", "library");
+        }
+        catch (Exception ex) when (ex is JSDisconnectedException or InvalidOperationException)
+        {
+            // The prerender pass has no circuit, and a closed circuit can no longer run script.
+        }
+    }
+}

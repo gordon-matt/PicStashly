@@ -1,25 +1,11 @@
 html {
   font-size: 14px;
-  position: relative;
-  min-height: 100%;
 }
 
 @media (min-width: 768px) {
   html {
     font-size: 16px;
   }
-}
-
-body {
-  margin-bottom: 60px;
-}
-
-.footer {
-  position: absolute;
-  bottom: 0;
-  width: 100%;
-  white-space: nowrap;
-  line-height: 60px;
 }
 
 /* Logo variant follows <html data-bs-theme> (set with the Bootswatch theme + theme-init.js). */
@@ -155,12 +141,19 @@ html[data-bs-theme="dark"] .navbar-brand-logo-dark {
 
 /* ── Sticky filter bar ────────────────────────────────────────────────── */
 
+/* The shell's content area is the scrollport and has 1rem of top padding. A sticky bar
+   with top: 0 sticks below that padding, and tiles scroll through the gap. Drop the
+   padding when this bar is present and let the bar's own background fill the strip. */
+.bf-content:has(.filter-bar) {
+  padding-top: 0;
+}
+
 .filter-bar {
   position: sticky;
   top: 0;
-  z-index: 100;
+  z-index: 20;
   background-color: var(--bs-body-bg);
-  padding: 0.5rem 0;
+  padding: 1rem 0 0.5rem;
   border-bottom: 1px solid var(--bs-border-color);
   margin-bottom: 0.75rem;
 }

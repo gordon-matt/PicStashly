@@ -1,0 +1,252 @@
+@page "/tags"
+@attribute [Authorize]
+@inject ITagService TagService
+@inject DialogService Dialogs
+@inject ToastService Toasts
+
+<PageTitle>Tags</PageTitle>
+
+<div class="container">
+    <PageHeader Title="Tags" Icon="tags" Description="Rename, merge or delete tags">
+        <Actions>
+            @if (selected.Count > 1)
+            {
+                <button type="button" class="btn btn-warning" @onclick="() => mergeOpen = true">
+                    <i class="bi bi-union"></i> Merge selected (@selected.Count)
+                </button>
+            }
+        </Actions>
+    </PageHeader>
+
+    @if (loading)
+    {
+        <div class="text-center py-5">
+            <div class="spinner-border" role="status"><span class="visually-hidden">Loading...</span></div>
+        </div>
+    }
+    else if (tags.Count == 0)
+    {
+        <div class="alert alert-info">
+            <i class="bi bi-info-circle me-2"></i> No tags yet — they'll appear here as you tag images.
+        </div>
+    }
+    else
+    {
+        <table class="table table-hover align-middle">
+            <thead>
+                <tr>
+                    <th style="width: 40px;"></th>
+                    <th>Name</th>
+                    <th class="text-end">Images</th>
+                    <th class="text-end" style="width: 200px;">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var tag in tags)
+                {
+                    <tr>
+                        <td>
+                            <input type="checkbox" class="form-check-input" checked="@selected.Contains(tag.Id)"
+                                   @onchange="() => Toggle(tag.Id)" />
+                        </td>
+                        <td>
+                            @if (editingId == tag.Id)
+                            {
+                                <input type="text" class="form-control form-control-sm d-inline-block w-auto"
+                                       @bind="editName" @bind:event="oninput" @onkeyup="OnRenameKey" />
+                            }
+                            else
+                            {
+                                <a href="@($"/?tags={Uri.EscapeDataString(tag.Name)}")">@tag.Name</a>
+                            }
+                        </td>
+                        <td class="text-end">@tag.UsageCount</td>
+                        <td class="text-end">
+                            @if (editingId == tag.Id)
+                            {
+                                <button type="button" class="btn btn-sm btn-success" title="Save" @onclick="SaveRename">
+                                    <i class="bi bi-check-lg"></i>
+                                </button>
+                                <button type="button" class="btn btn-sm btn-outline-secondary" title="Cancel" @onclick="CancelRename">
+                                    <i class="bi bi-x-lg"></i>
+                                </button>
+                            }
+                            else
+                            {
+                                <button type="button" class="btn btn-sm btn-outline-secondary" title="Rename" @onclick="() => StartRename(tag)">
+                                    <i class="bi bi-pencil"></i>
+                                </button>
+                                <button type="button" class="btn btn-sm btn-outline-danger" title="Delete" @onclick="() => DeleteTag(tag)">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+</div>
+
+@if (mergeOpen)
+{
+    <div class="modal fade show d-block" tabindex="-1" style="background: rgba(0,0,0,.5);">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Merge tags</h5>
+                    <button type="button" class="btn-close" aria-label="Close" @onclick="() => mergeOpen = false"></button>
+                </div>
+                <div class="modal-body">
+                    <p class="text-muted small">
+                        All selected tags will be merged into the target tag. Images keep their
+                        associations; the other tags are deleted.
+                    </p>
+                    <label class="form-label">Merge into:</label>
+                    <select class="form-select" @bind="mergeTargetId">
+                        @foreach (var tag in SelectedTags)
+                        {
+                            <option value="@tag.Id">@tag.Name</option>
+                        }
+                    </select>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" @onclick="() => mergeOpen = false">Cancel</button>
+                    <button type="button" class="btn btn-warning" @onclick="ConfirmMerge">
+                        <i class="bi bi-union"></i> Merge
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+}
+
+@code {
+    private List<TagItem> tags = [];
+    private readonly HashSet<int> selected = [];
+    private bool loading = true;
+    private bool mergeOpen;
+    private int? editingId;
+    private string editName = string.Empty;
+    private int mergeTargetId;
+
+    private IEnumerable<TagItem> SelectedTags => tags.Where(tag => selected.Contains(tag.Id));
+
+    protected override async Task OnInitializedAsync() => await Load();
+
+    private async Task Load()
+    {
+        loading = true;
+        var result = await TagService.GetTagsAsync();
+        loading = false;
+        if (!result.IsSuccess)
+        {
+            Toasts.ShowFailure(result);
+            return;
+        }
+
+        tags = result.Value.OrderBy(tag => tag.Name).ToList();
+        selected.RemoveWhere(id => tags.All(tag => tag.Id != id));
+        if (SelectedTags.All(tag => tag.Id != mergeTargetId))
+        {
+            mergeTargetId = SelectedTags.FirstOrDefault()?.Id ?? 0;
+        }
+    }
+
+    private void Toggle(int id)
+    {
+        if (!selected.Add(id))
+        {
+            selected.Remove(id);
+        }
+
+        if (SelectedTags.All(tag => tag.Id != mergeTargetId))
+        {
+            mergeTargetId = SelectedTags.FirstOrDefault()?.Id ?? 0;
+        }
+    }
+
+    private void StartRename(TagItem tag)
+    {
+        editingId = tag.Id;
+        editName = tag.Name;
+    }
+
+    private void CancelRename() => editingId = null;
+
+    private async Task OnRenameKey(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+        {
+            await SaveRename();
+        }
+        else if (e.Key == "Escape")
+        {
+            CancelRename();
+        }
+    }
+
+    private async Task SaveRename()
+    {
+        if (editingId is not int id || string.IsNullOrWhiteSpace(editName))
+        {
+            return;
+        }
+
+        var result = await TagService.RenameTagAsync(id, new RenameTagRequest(editName.Trim()));
+        if (!result.IsSuccess)
+        {
+            Toasts.ShowFailure(result);
+            return;
+        }
+
+        editingId = null;
+        Toasts.Success("Tag renamed.");
+        await Load();
+    }
+
+    private async Task DeleteTag(TagItem tag)
+    {
+        bool confirmed = await Dialogs.ConfirmAsync(
+            "Delete tag",
+            $"Delete \"{tag.Name}\"? Images keep their other tags.",
+            "Delete",
+            isDestructive: true);
+        if (!confirmed)
+        {
+            return;
+        }
+
+        var result = await TagService.DeleteTagAsync(tag.Id);
+        if (!result.IsSuccess)
+        {
+            Toasts.ShowFailure(result);
+            return;
+        }
+
+        selected.Remove(tag.Id);
+        Toasts.Success("Tag deleted.");
+        await Load();
+    }
+
+    private async Task ConfirmMerge()
+    {
+        List<int> sources = selected.Where(id => id != mergeTargetId).ToList();
+        if (mergeTargetId == 0 || sources.Count == 0)
+        {
+            return;
+        }
+
+        var result = await TagService.MergeTagsAsync(new MergeTagsRequest(mergeTargetId, sources));
+        if (!result.IsSuccess)
+        {
+            Toasts.ShowFailure(result);
+            return;
+        }
+
+        mergeOpen = false;
+        selected.Clear();
+        Toasts.Success("Tags merged.");
+        await Load();
+    }
+}

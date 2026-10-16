@@ -1,0 +1,149 @@
+@page "/capture"
+@attribute [Authorize]
+@inject IImageService Images
+@inject ToastService Toasts
+
+<PageTitle>Capture</PageTitle>
+
+<div class="container" style="max-width: 640px;">
+    <h2 class="mb-3">Stash it!</h2>
+
+    @if (string.IsNullOrWhiteSpace(ImageUrl))
+    {
+        <div class="alert alert-info">
+            No image was specified. Use the bookmarklet on a page, or go back to the <a href="/">library</a>.
+        </div>
+    }
+    else
+    {
+        <div class="card mb-3">
+            <img class="card-img-top upload-card-thumb" style="height: 240px;" src="@ImageUrl" alt="" />
+            <div class="card-body">
+                <p class="small text-muted text-break mb-1">@ImageUrl</p>
+                <div class="mb-3">
+                    <input class="form-control" placeholder="Tags..." @bind="tagsText" @bind:event="oninput" disabled="@(status is "saving" or "saved")" />
+                </div>
+
+                @if (status == "idle" || status == "error")
+                {
+                    @if (status == "error")
+                    {
+                        <div class="alert alert-danger py-2">
+                            <i class="bi bi-x-circle me-1"></i> @errorMessage
+                        </div>
+                    }
+                    <button type="button" class="btn btn-primary" @onclick="() => Save(false)">
+                        <i class="bi bi-cloud-arrow-up"></i> @(status == "error" ? "Retry" : "Save to library")
+                    </button>
+                }
+                else if (status == "saving")
+                {
+                    <div class="text-muted"><span class="spinner-border spinner-border-sm"></span> Saving...</div>
+                }
+                else if (status == "saved" && saved is not null)
+                {
+                    <div class="alert alert-success py-2">
+                        <i class="bi bi-check-circle me-1"></i> Saved!
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold d-flex justify-content-between align-items-center">
+                            Extracted text (OCR)
+                            <button type="button" class="btn btn-sm btn-outline-primary" disabled="@(!OcrDirty)" @onclick="SaveOcr">
+                                <i class="bi bi-save"></i> Save
+                            </button>
+                        </label>
+                        <textarea class="form-control" rows="4"
+                                  placeholder="No text extracted — correct or add it here to make the image searchable"
+                                  @bind="ocrText" @bind:event="oninput"></textarea>
+                    </div>
+                    <a class="btn btn-outline-primary" href="@($"/image/{saved.Id}")">View image</a>
+                }
+                else if (status == "duplicate")
+                {
+                    <div class="alert alert-warning py-2">
+                        <i class="bi bi-exclamation-triangle me-1"></i> You already have something similar:
+                    </div>
+                    <div class="d-flex flex-wrap gap-2 mb-2">
+                        @foreach (var match in duplicates)
+                        {
+                            <a href="@($"/image/{match.Id}")" target="_blank" title="@match.FileName" rel="noopener">
+                                <img class="dedup-thumb" src="@match.ThumbnailUrl" alt="" />
+                            </a>
+                        }
+                    </div>
+                    <button type="button" class="btn btn-primary" @onclick="() => Save(true)">Save anyway</button>
+                }
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private string tagsText = string.Empty;
+    private string ocrText = string.Empty;
+    private string status = "idle";
+    private string? errorMessage;
+    private ImageDetail? saved;
+    private List<DuplicateMatch> duplicates = [];
+
+    [SupplyParameterFromQuery]
+    public string? ImageUrl { get; set; }
+
+    [SupplyParameterFromQuery]
+    public string? PageUrl { get; set; }
+
+    private bool OcrDirty => saved is not null && !string.Equals(ocrText, saved.OcrText ?? string.Empty, StringComparison.Ordinal);
+
+    private async Task Save(bool force)
+    {
+        if (string.IsNullOrWhiteSpace(ImageUrl))
+        {
+            return;
+        }
+
+        status = "saving";
+        errorMessage = null;
+        List<string> tags = UiFormat.ParseTags(tagsText);
+        var result = await Images.IngestFromUrlAsync(
+            new CaptureRequest(ImageUrl, PageUrl, tags.Count == 0 ? null : tags),
+            force);
+
+        if (!result.IsSuccess)
+        {
+            status = "error";
+            errorMessage = result.Errors.FirstOrDefault()
+                ?? result.ValidationErrors.FirstOrDefault()?.ErrorMessage
+                ?? "Could not save that image.";
+            return;
+        }
+
+        if (result.Value.IsDuplicate)
+        {
+            duplicates = result.Value.Duplicates;
+            status = "duplicate";
+            return;
+        }
+
+        saved = result.Value.Image;
+        ocrText = saved?.OcrText ?? string.Empty;
+        status = "saved";
+    }
+
+    private async Task SaveOcr()
+    {
+        if (saved is null)
+        {
+            return;
+        }
+
+        var result = await Images.UpdateOcrTextAsync(saved.Id, new UpdateOcrTextRequest(ocrText));
+        if (!result.IsSuccess)
+        {
+            Toasts.ShowFailure(result);
+            return;
+        }
+
+        saved = saved with { OcrText = string.IsNullOrWhiteSpace(ocrText) ? null : ocrText };
+        Toasts.Success("Text updated.");
+    }
+}

@@ -1,16 +1,35 @@
 using System.Security.Claims;
+using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.Http;
 
 namespace PicStashly.Services;
 
-public class UserContextService(IHttpContextAccessor httpContextAccessor) : IUserContextService
+public class UserContextService(
+    IHttpContextAccessor httpContextAccessor,
+    AuthenticationStateProvider authenticationStateProvider) : IUserContextService
 {
-    public string? GetCurrentUserId() =>
-        httpContextAccessor.HttpContext?.User?.FindFirstValue(ClaimTypes.NameIdentifier);
+    public string? GetCurrentUserId() => User.FindFirstValue(ClaimTypes.NameIdentifier);
 
     public string GetRequiredUserId() =>
         GetCurrentUserId() ?? throw new InvalidOperationException("No authenticated user on the current request.");
 
-    public bool IsAdmin() =>
-        httpContextAccessor.HttpContext?.User?.IsInRole(Constants.Roles.Administrator) == true;
+    public bool IsAdmin() => User.IsInRole(Constants.Roles.Administrator);
+
+    /// <summary>
+    /// An MVC request has an <see cref="HttpContext"/>. A Blazor circuit does not, after the
+    /// first render, so the signed-in principal is read from the circuit authentication state.
+    /// </summary>
+    private ClaimsPrincipal User
+    {
+        get
+        {
+            ClaimsPrincipal? httpUser = httpContextAccessor.HttpContext?.User;
+            if (httpUser?.Identity?.IsAuthenticated == true)
+            {
+                return httpUser;
+            }
+
+            return authenticationStateProvider.GetAuthenticationStateAsync().GetAwaiter().GetResult().User;
+        }
+    }
 }

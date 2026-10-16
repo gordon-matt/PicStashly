@@ -55,8 +55,8 @@ internal static class ServiceCollectionExtensions
                     options.IncludeAuthController = false;
                     options.RegisterUserContext = false;
                     options.Identity.UseRelaxedPasswordPolicy = false;
-                    options.AccessDeniedPath = "/Home/AccessDenied";
-                    options.RemoteFailurePath = "/Home/Error";
+                    options.AccessDeniedPath = "/access-denied";
+                    options.RemoteFailurePath = "/error";
                     options.Keycloak.RequireHttpsMetadata = false;
                     options.Keycloak.CorrelationCookieSameSite = SameSiteMode.None;
                     options.Keycloak.CorrelationCookieSecurePolicy = CookieSecurePolicy.Always;

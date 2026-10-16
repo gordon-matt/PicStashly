@@ -1,0 +1,18 @@
+<ForgeHostPage Title="PicStashly" IconHref="img/Icon.png" AppStylesheet="@Assets["css/site.css"]">
+    <AdditionalHead>
+        <link rel="manifest" href="manifest.webmanifest" />
+        <link rel="alternate icon" href="favicon.ico" />
+        <meta name="theme-color" content="#375a7f" />
+    </AdditionalHead>
+    <ChildContent>
+        <Routes @rendermode="InteractiveServer" />
+    </ChildContent>
+    <AdditionalBody>
+        <script src="@Assets["js/picstashly.js"]"></script>
+        <script>
+            if ('serviceWorker' in navigator) {
+                navigator.serviceWorker.register('/service-worker.js');
+            }
+        </script>
+    </AdditionalBody>
+</ForgeHostPage>

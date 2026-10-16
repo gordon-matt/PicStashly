@@ -1,0 +1,318 @@
+@page "/image/{Id:int}"
+@attribute [Authorize]
+@inject IImageService Images
+@inject ITagService TagService
+@inject ICategoryService CategoryService
+@inject DialogService Dialogs
+@inject ToastService Toasts
+@inject IJSRuntime Js
+@inject NavigationManager Navigation
+
+<PageTitle>@(image?.FileName ?? "Image")</PageTitle>
+
+<div class="container-fluid">
+    @if (loading)
+    {
+        <div class="text-center py-5">
+            <div class="spinner-border" role="status"><span class="visually-hidden">Loading...</span></div>
+        </div>
+    }
+    else if (image is null)
+    {
+        <EmptyState Title="Image not found" Icon="image" Description="It may have been deleted.">
+            <a class="btn btn-outline-primary" href="/">Back to the library</a>
+        </EmptyState>
+    }
+    else
+    {
+        <datalist id="detail-tag-suggestions">
+            @foreach (var name in tagNames)
+            {
+                <option value="@name"></option>
+            }
+        </datalist>
+
+        <div class="row g-4">
+            <div class="col-12 col-lg-8 text-center">
+                <img class="detail-image" src="@image.Url" alt="@image.FileName" />
+            </div>
+            <div class="col-12 col-lg-4">
+                <div class="mb-3">
+                    <label class="form-label fw-semibold d-flex justify-content-between align-items-center">
+                        File name
+                        <button type="button" class="btn btn-sm btn-outline-primary" disabled="@(!FileNameDirty)" @onclick="SaveFileName">
+                            <i class="bi bi-save"></i> Save
+                        </button>
+                    </label>
+                    <div class="input-group">
+                        <input type="text" class="form-control" maxlength="512" @bind="fileNameBase" @bind:event="oninput" />
+                        <span class="input-group-text">@fileExtension</span>
+                    </div>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label fw-semibold">Tags</label>
+                    <input class="form-control" list="detail-tag-suggestions" placeholder="Add tags..."
+                           @bind="tagsText" @bind:event="oninput" @onblur="SaveTags" />
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label fw-semibold">Category</label>
+                    <select class="form-select" @onchange="ChangeCategory">
+                        <option value="" selected="@(image.CategoryId is null)">No category</option>
+                        @foreach (var category in categories)
+                        {
+                            <option value="@category.Id" selected="@(image.CategoryId == category.Id)">@category.Name</option>
+                        }
+                    </select>
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label fw-semibold d-flex justify-content-between align-items-center">
+                        Extracted text (OCR)
+                        <button type="button" class="btn btn-sm btn-outline-primary" disabled="@(!OcrDirty)" @onclick="SaveOcr">
+                            <i class="bi bi-save"></i> Save
+                        </button>
+                    </label>
+                    <textarea class="form-control" rows="5"
+                              placeholder="No text extracted — you can add/correct it here to make the image searchable"
+                              @bind="ocrText" @bind:event="oninput"></textarea>
+                </div>
+
+                <table class="table table-sm">
+                    <tbody>
+                        <tr>
+                            <th scope="row">Dimensions</th>
+                            <td>@image.Width × @image.Height</td>
+                        </tr>
+                        <tr>
+                            <th scope="row">File size</th>
+                            <td>@UiFormat.FileSize(image.FileSizeBytes)</td>
+                        </tr>
+                        <tr>
+                            <th scope="row">Type</th>
+                            <td>@image.ContentType</td>
+                        </tr>
+                        <tr>
+                            <th scope="row">Added</th>
+                            <td>@image.DateAdded.ToLocalTime().ToString("g")</td>
+                        </tr>
+                        <tr>
+                            <th scope="row">pHash</th>
+                            <td><code>@image.PerceptualHash</code></td>
+                        </tr>
+                        @if (!string.IsNullOrWhiteSpace(image.SourceUrl))
+                        {
+                            <tr>
+                                <th scope="row">Source</th>
+                                <td class="text-break">
+                                    <a href="@image.SourceUrl" target="_blank" rel="noopener">@image.SourceUrl</a>
+                                </td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+
+                <div class="d-flex gap-2">
+                    <button type="button" class="btn btn-outline-primary" @onclick="CopyImage">
+                        <i class="bi bi-clipboard"></i> Copy
+                    </button>
+                    <a class="btn btn-outline-primary" href="@image.Url" download="@image.FileName">
+                        <i class="bi bi-download"></i> Download
+                    </a>
+                    <button type="button" class="btn btn-outline-danger" @onclick="DeleteImage">
+                        <i class="bi bi-trash"></i> Delete
+                    </button>
+                    <a href="/" class="btn btn-outline-secondary ms-auto">
+                        <i class="bi bi-grid-3x3-gap"></i> Library
+                    </a>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+@code {
+    private ImageDetail? image;
+    private List<CategoryItem> categories = [];
+    private List<string> tagNames = [];
+    private string fileNameBase = string.Empty;
+    private string fileExtension = string.Empty;
+    private string tagsText = string.Empty;
+    private string ocrText = string.Empty;
+    private bool loading = true;
+
+    [Parameter]
+    public int Id { get; set; }
+
+    private bool FileNameDirty =>
+        image is not null && !string.Equals(fileNameBase + fileExtension, image.FileName, StringComparison.Ordinal);
+
+    private bool OcrDirty => image is not null && !string.Equals(ocrText, image.OcrText ?? string.Empty, StringComparison.Ordinal);
+
+    protected override async Task OnParametersSetAsync() => await Load();
+
+    private async Task Load()
+    {
+        loading = true;
+        var result = await Images.GetByIdAsync(Id);
+        if (!result.IsSuccess)
+        {
+            image = null;
+            loading = false;
+            return;
+        }
+
+        Apply(result.Value);
+        var categoryResult = await CategoryService.GetCategoriesAsync();
+        if (categoryResult.IsSuccess)
+        {
+            categories = categoryResult.Value;
+        }
+
+        var tagResult = await TagService.GetTagsAsync();
+        if (tagResult.IsSuccess)
+        {
+            tagNames = tagResult.Value.Select(tag => tag.Name).OrderBy(name => name).ToList();
+        }
+
+        loading = false;
+    }
+
+    private void Apply(ImageDetail detail)
+    {
+        image = detail;
+        (fileNameBase, fileExtension) = UiFormat.SplitFileName(detail.FileName);
+        tagsText = UiFormat.JoinTags(detail.Tags);
+        ocrText = detail.OcrText ?? string.Empty;
+    }
+
+    private async Task SaveFileName()
+    {
+        if (image is null || string.IsNullOrWhiteSpace(fileNameBase))
+        {
+            return;
+        }
+
+        var result = await Images.RenameAsync(image.Id, new RenameImageRequest(fileNameBase.Trim() + fileExtension));
+        if (!result.IsSuccess)
+        {
+            Toasts.ShowFailure(result);
+            return;
+        }
+
+        Apply(result.Value);
+        Toasts.Success("File name updated.");
+    }
+
+    private async Task SaveTags()
+    {
+        if (image is null)
+        {
+            return;
+        }
+
+        List<string> names = UiFormat.ParseTags(tagsText);
+        if (names.SequenceEqual(image.Tags, StringComparer.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        var result = await Images.SetTagsAsync(image.Id, new SetImageTagsRequest(names));
+        if (!result.IsSuccess)
+        {
+            Toasts.ShowFailure(result);
+            return;
+        }
+
+        image = image with { Tags = result.Value };
+        tagsText = UiFormat.JoinTags(result.Value);
+    }
+
+    private async Task ChangeCategory(ChangeEventArgs e)
+    {
+        if (image is null)
+        {
+            return;
+        }
+
+        int? categoryId = int.TryParse(e.Value?.ToString(), out int id) ? id : null;
+        if (categoryId == image.CategoryId)
+        {
+            return;
+        }
+
+        var result = await Images.SetCategoryAsync(image.Id, new SetImageCategoryRequest(categoryId));
+        if (!result.IsSuccess)
+        {
+            Toasts.ShowFailure(result);
+            return;
+        }
+
+        Apply(result.Value);
+        Toasts.Success("Category updated.");
+    }
+
+    private async Task SaveOcr()
+    {
+        if (image is null)
+        {
+            return;
+        }
+
+        var result = await Images.UpdateOcrTextAsync(image.Id, new UpdateOcrTextRequest(ocrText));
+        if (!result.IsSuccess)
+        {
+            Toasts.ShowFailure(result);
+            return;
+        }
+
+        image = image with { OcrText = string.IsNullOrWhiteSpace(ocrText) ? null : ocrText };
+        Toasts.Success("Text updated.");
+    }
+
+    private async Task CopyImage()
+    {
+        if (image is null)
+        {
+            return;
+        }
+
+        try
+        {
+            await Js.InvokeVoidAsync("picstashly.copyImage", image.Url);
+            Toasts.Success("Image copied to clipboard.");
+        }
+        catch (JSException ex)
+        {
+            Toasts.Error(string.IsNullOrWhiteSpace(ex.Message) ? "Failed to copy image." : ex.Message);
+        }
+    }
+
+    private async Task DeleteImage()
+    {
+        if (image is null)
+        {
+            return;
+        }
+
+        bool confirmed = await Dialogs.ConfirmAsync(
+            "Delete image",
+            $"Delete \"{image.FileName}\"? This cannot be undone.",
+            "Delete",
+            isDestructive: true);
+        if (!confirmed)
+        {
+            return;
+        }
+
+        var result = await Images.DeleteAsync(image.Id);
+        if (!result.IsSuccess)
+        {
+            Toasts.ShowFailure(result);
+            return;
+        }
+
+        Navigation.NavigateTo("/");
+    }
+}

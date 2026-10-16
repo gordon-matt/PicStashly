@@ -6,7 +6,10 @@
 		<ImplicitUsings>enable</ImplicitUsings>
 		<UserSecretsId>4f8cedf2-9307-4c1d-af60-aa26283e8ef2</UserSecretsId>
 		<DockerDefaultTargetOS>Linux</DockerDefaultTargetOS>
-		<Version>1.0.2</Version>
+		<!-- The Bootstrap shell is a project reference outside this solution, so the image
+		     context is the SelfHosted folder (the parent of PicStashly and Heroicsoft.NetForge). -->
+		<DockerfileContext>..\..</DockerfileContext>
+		<Version>1.1.0</Version>
 		<!--
 		  LogVue's dashboard needs the framework's blazor.web.js. The Web SDK only restores that
 		  file when this property is set on the host, and package props are not imported during
@@ -18,6 +21,7 @@
 	<ItemGroup>
 		<PackageReference Include="Ardalis.Result.AspNetCore" Version="10.1.0" />
 		<PackageReference Include="Heroicsoft.NetForge.Authentication" Version="1.0.1" />
+		<PackageReference Include="Heroicsoft.NetForge.Components.Bootstrap" Version="1.0.2" />
 		<PackageReference Include="LogVue" Version="1.0.0" />
 		<PackageReference Include="Microsoft.AspNetCore.Authentication.OpenIdConnect" Version="10.0.12" />
 		<PackageReference Include="Microsoft.AspNetCore.Diagnostics.EntityFrameworkCore" Version="10.0.12" />

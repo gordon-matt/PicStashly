@@ -1,0 +1,203 @@
+@page "/categories"
+@attribute [Authorize]
+@inject ICategoryService CategoryService
+@inject DialogService Dialogs
+@inject ToastService Toasts
+
+<PageTitle>Categories</PageTitle>
+
+<div class="container">
+    <PageHeader Title="Categories" Icon="folder2-open" Description="Create, rename or delete categories used to organize images" />
+
+    <div class="row g-2 mb-4 align-items-center">
+        <div class="col-auto">
+            <label class="col-form-label" for="newCategory">New category:</label>
+        </div>
+        <div class="col-12 col-md-4">
+            <input id="newCategory" class="form-control" placeholder="Category name..."
+                   @bind="newName" @bind:event="oninput" @onkeyup="OnCreateKey" />
+        </div>
+        <div class="col-auto">
+            <button type="button" class="btn btn-success" disabled="@(string.IsNullOrWhiteSpace(newName))" @onclick="Create">
+                <i class="bi bi-plus-lg"></i> Add
+            </button>
+        </div>
+    </div>
+
+    @if (loading)
+    {
+        <div class="text-center py-5">
+            <div class="spinner-border" role="status"><span class="visually-hidden">Loading...</span></div>
+        </div>
+    }
+    else if (categories.Count == 0)
+    {
+        <div class="alert alert-info">
+            <i class="bi bi-info-circle me-2"></i> No categories yet — create one above to start organizing your images.
+        </div>
+    }
+    else
+    {
+        <table class="table table-hover align-middle">
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th class="text-end">Images</th>
+                    <th class="text-end" style="width: 160px;">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var category in categories)
+                {
+                    <tr>
+                        <td>
+                            @if (editingId == category.Id)
+                            {
+                                <input type="text" class="form-control form-control-sm d-inline-block w-auto"
+                                       @bind="editName" @bind:event="oninput" @onkeyup="OnRenameKey" />
+                            }
+                            else
+                            {
+                                <a href="@($"/?categoryId={category.Id}")">@category.Name</a>
+                            }
+                        </td>
+                        <td class="text-end">@category.ImageCount</td>
+                        <td class="text-end">
+                            @if (editingId == category.Id)
+                            {
+                                <button type="button" class="btn btn-sm btn-success" title="Save" @onclick="SaveRename">
+                                    <i class="bi bi-check-lg"></i>
+                                </button>
+                                <button type="button" class="btn btn-sm btn-outline-secondary" title="Cancel" @onclick="CancelRename">
+                                    <i class="bi bi-x-lg"></i>
+                                </button>
+                            }
+                            else
+                            {
+                                <button type="button" class="btn btn-sm btn-outline-secondary" title="Rename" @onclick="() => StartRename(category)">
+                                    <i class="bi bi-pencil"></i>
+                                </button>
+                                <button type="button" class="btn btn-sm btn-outline-danger" title="Delete" @onclick="() => DeleteCategory(category)">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+</div>
+
+@code {
+    private List<CategoryItem> categories = [];
+    private bool loading = true;
+    private string newName = string.Empty;
+    private int? editingId;
+    private string editName = string.Empty;
+
+    protected override async Task OnInitializedAsync() => await Load();
+
+    private async Task Load()
+    {
+        loading = true;
+        var result = await CategoryService.GetCategoriesAsync();
+        loading = false;
+        if (!result.IsSuccess)
+        {
+            Toasts.ShowFailure(result);
+            return;
+        }
+
+        categories = result.Value.OrderBy(category => category.Name).ToList();
+    }
+
+    private async Task OnCreateKey(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+        {
+            await Create();
+        }
+    }
+
+    private async Task Create()
+    {
+        if (string.IsNullOrWhiteSpace(newName))
+        {
+            return;
+        }
+
+        var result = await CategoryService.CreateCategoryAsync(new CreateCategoryRequest(newName.Trim()));
+        if (!result.IsSuccess)
+        {
+            Toasts.ShowFailure(result);
+            return;
+        }
+
+        newName = string.Empty;
+        Toasts.Success("Category created.");
+        await Load();
+    }
+
+    private void StartRename(CategoryItem category)
+    {
+        editingId = category.Id;
+        editName = category.Name;
+    }
+
+    private void CancelRename() => editingId = null;
+
+    private async Task OnRenameKey(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+        {
+            await SaveRename();
+        }
+        else if (e.Key == "Escape")
+        {
+            CancelRename();
+        }
+    }
+
+    private async Task SaveRename()
+    {
+        if (editingId is not int id || string.IsNullOrWhiteSpace(editName))
+        {
+            return;
+        }
+
+        var result = await CategoryService.RenameCategoryAsync(id, new RenameCategoryRequest(editName.Trim()));
+        if (!result.IsSuccess)
+        {
+            Toasts.ShowFailure(result);
+            return;
+        }
+
+        editingId = null;
+        Toasts.Success("Category renamed.");
+        await Load();
+    }
+
+    private async Task DeleteCategory(CategoryItem category)
+    {
+        bool confirmed = await Dialogs.ConfirmAsync(
+            "Delete category",
+            $"Delete \"{category.Name}\"? Images in it become uncategorised.",
+            "Delete",
+            isDestructive: true);
+        if (!confirmed)
+        {
+            return;
+        }
+
+        var result = await CategoryService.DeleteCategoryAsync(category.Id);
+        if (!result.IsSuccess)
+        {
+            Toasts.ShowFailure(result);
+            return;
+        }
+
+        Toasts.Success("Category deleted.");
+        await Load();
+    }
+}

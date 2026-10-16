@@ -1,0 +1,411 @@
+@page "/admin"
+@attribute [Authorize(Roles = Constants.Roles.Administrator)]
+@using System.Security.Claims
+@using Microsoft.AspNetCore.Identity
+@using PicStashly.Data.Entities
+@inject IAdminService AdminService
+@inject IAuthProviderService Auth
+@inject AuthenticationStateProvider Authentication
+@inject IServiceProvider Services
+@inject IJSRuntime Js
+@inject ToastService Toasts
+
+<PageTitle>Admin</PageTitle>
+
+<div class="container">
+    <PageHeader Title="Admin" Icon="gear" />
+
+    <div class="row g-3 mb-4">
+        <div class="col-6 col-md-3">
+            <div class="card text-center h-100">
+                <div class="card-body">
+                    <h3>@(stats is null ? "—" : stats.ImageCount.ToString("N0"))</h3>
+                    <span class="text-muted">Images</span>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="card text-center h-100">
+                <div class="card-body">
+                    <h3>@(stats is null ? "—" : UiFormat.FileSize(stats.TotalSizeBytes))</h3>
+                    <span class="text-muted">Total size</span>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="card text-center h-100">
+                <div class="card-body">
+                    <h3>@(stats is null ? "—" : stats.TagCount.ToString("N0"))</h3>
+                    <span class="text-muted">Tags</span>
+                </div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="card text-center h-100">
+                <div class="card-body">
+                    <h3>@(stats is null ? "—" : stats.UntaggedImageCount.ToString("N0"))</h3>
+                    <span class="text-muted">Untagged</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    @if (stats is { OcrAvailable: false })
+    {
+        <div class="alert alert-warning">
+            <i class="bi bi-exclamation-triangle me-1"></i>
+            <strong>OCR is unavailable</strong> — PaddleOCR's native stack failed to load, so text
+            extraction is being skipped for every upload. Models are bundled with the app, so this is
+            almost always a missing system dependency:
+            <ul class="mb-2">
+                <li><strong>Windows:</strong> install the latest
+                    <a href="https://aka.ms/vs/17/release/vc_redist.x64.exe" target="_blank" rel="noopener">Visual C++ Redistributable (x64)</a>,
+                    then restart the app.</li>
+                <li><strong>Linux/Docker:</strong> ensure <code>libgomp1</code> is installed (it's already
+                    added in this app's Docker image).</li>
+                <li>If your CPU is old and lacks AVX, set <code>Ocr:Device</code> to <code>Openblas</code>
+                    in <code>appsettings.json</code>.</li>
+            </ul>
+            Once it's working, use <strong>Re-run OCR on all images</strong> below to backfill existing uploads.
+        </div>
+    }
+
+    <div class="card mb-4">
+        <div class="card-header"><i class="bi bi-tools me-1"></i> Maintenance</div>
+        <div class="card-body">
+            <div class="d-flex flex-wrap gap-2 mb-3">
+                <button type="button" class="btn btn-outline-primary" disabled="@busy" @onclick="RunOrphanCheck">
+                    <i class="bi bi-search"></i> Check for orphans / broken files
+                </button>
+                <button type="button" class="btn btn-outline-primary" disabled="@busy" @onclick="RunRehash">
+                    <i class="bi bi-fingerprint"></i> Re-compute all hashes
+                </button>
+                <button type="button" class="btn btn-outline-primary" disabled="@busy" @onclick="RunReOcr">
+                    <i class="bi bi-body-text"></i> Re-run OCR on all images
+                </button>
+                @if (busy)
+                {
+                    <span class="align-self-center text-muted">
+                        <span class="spinner-border spinner-border-sm"></span> Working — this can take a while...
+                    </span>
+                }
+            </div>
+
+            @if (!string.IsNullOrWhiteSpace(maintenanceMessage))
+            {
+                <div class="alert alert-info py-2">@maintenanceMessage</div>
+            }
+
+            @if (orphans is not null)
+            {
+                <h6 class="mt-3">Orphaned files (on disk, not in database): @orphans.OrphanedFiles.Count</h6>
+                <ul class="small">
+                    @foreach (var path in orphans.OrphanedFiles)
+                    {
+                        <li><code>@path</code></li>
+                    }
+                </ul>
+                <h6>Broken images (in database, file missing): @orphans.BrokenImages.Count</h6>
+                <ul class="small">
+                    @foreach (var image in orphans.BrokenImages)
+                    {
+                        <li><a href="@($"/image/{image.Id}")">@image.FileName</a></li>
+                    }
+                </ul>
+            }
+        </div>
+    </div>
+
+    @if (Auth.IsIdentity)
+    {
+        <div class="card mb-4">
+            <div class="card-header"><i class="bi bi-people me-1"></i> Users</div>
+            <div class="card-body">
+                <p class="text-muted small">
+                    Anyone can register an account, but new accounts start locked — approve them here
+                    before they can log in. Each user's images, tags and categories are
+                    private to their own account.
+                </p>
+
+                @if (usersLoading)
+                {
+                    <div class="text-center py-3">
+                        <div class="spinner-border spinner-border-sm text-primary" role="status">
+                            <span class="visually-hidden">Loading…</span>
+                        </div>
+                    </div>
+                }
+                else if (users.Count == 0)
+                {
+                    <div class="text-muted text-center py-2">No users found.</div>
+                }
+                else
+                {
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>Email</th>
+                                    <th>Status</th>
+                                    <th>Role</th>
+                                    <th></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach (var user in users)
+                                {
+                                    <tr>
+                                        <td>
+                                            @user.Email
+                                            @if (user.IsCurrent)
+                                            {
+                                                <span class="badge bg-secondary ms-1">You</span>
+                                            }
+                                        </td>
+                                        <td>
+                                            @if (user.IsPending)
+                                            {
+                                                <span class="badge bg-warning text-dark"><i class="bi bi-hourglass-split"></i> Pending approval</span>
+                                            }
+                                            else
+                                            {
+                                                <span class="badge bg-success"><i class="bi bi-check-circle"></i> Active</span>
+                                            }
+                                        </td>
+                                        <td>
+                                            @if (user.IsCurrent)
+                                            {
+                                                <span class="badge rounded-pill text-bg-primary">@user.Role</span>
+                                            }
+                                            else
+                                            {
+                                                <select class="form-select form-select-sm" style="width: auto;" @onchange="e => ChangeRole(user, e)">
+                                                    <option value="@Constants.Roles.Administrator" selected="@(user.Role == Constants.Roles.Administrator)">Administrator</option>
+                                                    <option value="@Constants.Roles.User" selected="@(user.Role == Constants.Roles.User)">User</option>
+                                                </select>
+                                            }
+                                        </td>
+                                        <td class="text-end">
+                                            @if (user.IsPending)
+                                            {
+                                                <button type="button" class="btn btn-sm btn-success" @onclick="() => Approve(user)">
+                                                    <i class="bi bi-check-lg"></i> Approve
+                                                </button>
+                                            }
+                                            else
+                                            {
+                                                <button type="button" class="btn btn-sm btn-outline-warning" disabled="@user.IsCurrent" @onclick="() => Lock(user)">
+                                                    <i class="bi bi-lock"></i> Lock
+                                                </button>
+                                            }
+                                        </td>
+                                    </tr>
+                                }
+                            </tbody>
+                        </table>
+                    </div>
+                }
+            </div>
+        </div>
+    }
+
+    <div class="card mb-4">
+        <div class="card-header"><i class="bi bi-bookmark-plus me-1"></i> Bookmarklet</div>
+        <div class="card-body">
+            <p class="text-muted small">
+                Drag this link to your bookmarks bar. Clicking it on any webpage lets you pick an
+                image on the page and save it straight into PicStashly (with the page URL recorded
+                as the source).
+            </p>
+            <a class="btn btn-outline-primary" href="@bookmarkletHref">
+                <i class="bi bi-images"></i> Stash it!
+            </a>
+        </div>
+    </div>
+</div>
+
+@code {
+    private StorageStats? stats;
+    private OrphanCheckResult? orphans;
+    private string? maintenanceMessage;
+    private bool busy;
+    private bool usersLoading;
+    private List<AccountRow> users = [];
+    private string? currentUserId;
+    private string bookmarkletHref = "javascript:void(0)";
+
+    protected override async Task OnInitializedAsync()
+    {
+        var auth = await Authentication.GetAuthenticationStateAsync();
+        currentUserId = auth.User.FindFirstValue(ClaimTypes.NameIdentifier);
+
+        var statsResult = await AdminService.GetStorageStatsAsync();
+        if (statsResult.IsSuccess)
+        {
+            stats = statsResult.Value;
+        }
+        else
+        {
+            Toasts.ShowFailure(statsResult);
+        }
+
+        if (Auth.IsIdentity)
+        {
+            await LoadUsers();
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender || bookmarkletHref.StartsWith("javascript:", StringComparison.Ordinal) && bookmarkletHref.Length > 20)
+        {
+            return;
+        }
+
+        bookmarkletHref = await Js.InvokeAsync<string>("picstashly.buildBookmarklet");
+        StateHasChanged();
+    }
+
+    private async Task RunOrphanCheck()
+    {
+        busy = true;
+        maintenanceMessage = null;
+        var result = await AdminService.CheckOrphansAsync();
+        busy = false;
+        if (!result.IsSuccess)
+        {
+            Toasts.ShowFailure(result);
+            return;
+        }
+
+        orphans = result.Value;
+        maintenanceMessage = $"Orphan check finished: {orphans.OrphanedFiles.Count} orphaned file(s), {orphans.BrokenImages.Count} broken image(s).";
+    }
+
+    private Task RunRehash() => RunMaintenance("Re-compute hashes", token => AdminService.RehashAllAsync(token));
+
+    private Task RunReOcr() => RunMaintenance("Re-run OCR", token => AdminService.ReRunOcrAsync(token));
+
+    private async Task RunMaintenance(string label, Func<CancellationToken, Task<Result<MaintenanceResult>>> action)
+    {
+        busy = true;
+        maintenanceMessage = null;
+        var result = await action(CancellationToken.None);
+        busy = false;
+        if (!result.IsSuccess)
+        {
+            Toasts.ShowFailure(result);
+            return;
+        }
+
+        maintenanceMessage = $"{label} finished: {result.Value.Processed} processed, {result.Value.Failed} failed.";
+    }
+
+    private async Task LoadUsers()
+    {
+        UserManager<ApplicationUser>? userManager = Services.GetService<UserManager<ApplicationUser>>();
+        if (userManager is null)
+        {
+            return;
+        }
+
+        usersLoading = true;
+        var rows = new List<AccountRow>();
+        foreach (ApplicationUser user in userManager.Users.OrderBy(user => user.Email).ToList())
+        {
+            bool pending = user.LockoutEnabled && user.LockoutEnd is DateTimeOffset end && end > DateTimeOffset.UtcNow;
+            IList<string> roles = await userManager.GetRolesAsync(user);
+            rows.Add(new AccountRow
+            {
+                Id = user.Id,
+                Email = user.Email ?? user.UserName ?? user.Id,
+                Role = roles.FirstOrDefault() ?? string.Empty,
+                IsPending = pending,
+                IsCurrent = user.Id == currentUserId,
+            });
+        }
+
+        users = rows;
+        usersLoading = false;
+    }
+
+    private async Task Approve(AccountRow row)
+    {
+        UserManager<ApplicationUser>? userManager = Services.GetService<UserManager<ApplicationUser>>();
+        ApplicationUser? user = userManager is null ? null : await userManager.FindByIdAsync(row.Id);
+        if (userManager is null || user is null)
+        {
+            Toasts.Error("User not found.");
+            return;
+        }
+
+        await userManager.SetLockoutEndDateAsync(user, null);
+        Toasts.Success("User approved.");
+        await LoadUsers();
+    }
+
+    private async Task Lock(AccountRow row)
+    {
+        if (row.IsCurrent)
+        {
+            Toasts.Error("You cannot lock your own account.");
+            return;
+        }
+
+        UserManager<ApplicationUser>? userManager = Services.GetService<UserManager<ApplicationUser>>();
+        ApplicationUser? user = userManager is null ? null : await userManager.FindByIdAsync(row.Id);
+        if (userManager is null || user is null)
+        {
+            Toasts.Error("User not found.");
+            return;
+        }
+
+        await userManager.SetLockoutEnabledAsync(user, true);
+        await userManager.SetLockoutEndDateAsync(user, DateTimeOffset.MaxValue);
+        Toasts.Success("User locked.");
+        await LoadUsers();
+    }
+
+    private async Task ChangeRole(AccountRow row, ChangeEventArgs e)
+    {
+        if (row.IsCurrent)
+        {
+            Toasts.Error("You cannot change your own role.");
+            return;
+        }
+
+        string role = e.Value?.ToString() ?? string.Empty;
+        if (role is not (Constants.Roles.Administrator or Constants.Roles.User))
+        {
+            Toasts.Error("That role is not valid.");
+            return;
+        }
+
+        UserManager<ApplicationUser>? userManager = Services.GetService<UserManager<ApplicationUser>>();
+        ApplicationUser? user = userManager is null ? null : await userManager.FindByIdAsync(row.Id);
+        if (userManager is null || user is null)
+        {
+            Toasts.Error("User not found.");
+            return;
+        }
+
+        IList<string> current = await userManager.GetRolesAsync(user);
+        await userManager.RemoveFromRolesAsync(user, current);
+        await userManager.AddToRoleAsync(user, role);
+        row.Role = role;
+        Toasts.Success("Role updated.");
+    }
+
+    private sealed class AccountRow
+    {
+        public required string Id { get; init; }
+
+        public required string Email { get; init; }
+
+        public string Role { get; set; } = string.Empty;
+
+        public bool IsPending { get; init; }
+
+        public bool IsCurrent { get; init; }
+    }
+}

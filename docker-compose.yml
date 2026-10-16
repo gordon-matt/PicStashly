@@ -1,8 +1,8 @@
 services:
   app:
     build:
-      context: .
-      dockerfile: PicStashly/Dockerfile
+      context: ..
+      dockerfile: PicStashly/PicStashly/Dockerfile
     container_name: picstashly
     restart: unless-stopped
     ports:
