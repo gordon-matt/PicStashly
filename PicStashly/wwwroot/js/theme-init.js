@@ -26,8 +26,8 @@
         document.documentElement.setAttribute(
             'data-bs-theme',
             DARK[t] ? 'dark' : 'light');
-        // Note: <nav> does not exist yet (this runs in <head>). theme-picker.js syncs
-        // nav[data-bs-theme] on DOMContentLoaded; site.css also keys off html[data-bs-theme].
+        // The Blazor shell's theme picker reads the same localStorage key. This script
+        // only has to paint the Identity pages, which are not inside that shell.
     } catch (e) {
         /* private mode / blocked storage */
     }

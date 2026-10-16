@@ -8,32 +8,6 @@ html {
   }
 }
 
-/* Logo variant follows <html data-bs-theme> (set with the Bootswatch theme + theme-init.js). */
-.navbar-brand-logo {
-  display: block;
-  height: 50px;
-  width: auto;
-}
-
-.navbar-brand-logo-dark {
-  display: none;
-}
-
-html[data-bs-theme="dark"] .navbar-brand-logo-light {
-  display: none;
-}
-
-html[data-bs-theme="dark"] .navbar-brand-logo-dark {
-  display: block;
-}
-
-/* ── Theme picker modal ───────────────────────────────────────────────── */
-
-.theme-picker-theme-list {
-  max-height: min(45vh, 420px);
-  overflow-y: auto;
-}
-
 /* ── Library masonry grid ─────────────────────────────────────────────── */
 
 .masonry-grid {
@@ -249,66 +223,6 @@ html[data-bs-theme="dark"] .navbar-brand-logo-dark {
   height: 90px;
   object-fit: cover;
   border-radius: 0.375rem;
-}
-
-/* ── Tagify: follow Bootstrap theme tokens ────────────────────────────── */
-
-.tagify {
-  --tags-border-color: var(--bs-border-color);
-  --tags-hover-border-color: var(--bs-primary);
-  --tags-focus-border-color: var(--bs-primary);
-  --tagify-dd-bg-color: var(--bs-body-bg);
-  --tagify-dd-color-primary: var(--bs-primary);
-  color: var(--bs-body-color);
-  background-color: var(--bs-body-bg);
-}
-
-/* Draft text while typing (Darkly / other dark themes otherwise inherit near-invisible colors). */
-.tagify__input {
-  color: var(--bs-body-color) !important;
-}
-
-.tagify__input::before {
-  color: var(--bs-secondary-color);
-  opacity: 1;
-}
-
-.tagify__tag > div {
-  color: var(--bs-body-color);
-}
-
-.tagify__dropdown {
-  background: var(--bs-body-bg);
-  border-color: var(--bs-border-color);
-  color: var(--bs-body-color);
-}
-
-.tagify__dropdown__item--active {
-  background: var(--bs-primary);
-  color: var(--bs-primary-color, #fff);
-}
-
-/*
- * Bootswatch Darkly's .navbar defaults to light-theme link colors (near-black). Without
- * navbar-dark / [data-bs-theme=dark] on the nav, "Hello" / Logout vanish on dark chrome.
- * Key off <html data-bs-theme> so this works even before the nav attribute is synced.
- */
-html[data-bs-theme="dark"] .navbar {
-  --bs-navbar-color: rgba(255, 255, 255, 0.7);
-  --bs-navbar-hover-color: #fff;
-  --bs-navbar-disabled-color: rgba(255, 255, 255, 0.25);
-  --bs-navbar-active-color: #fff;
-  --bs-navbar-brand-color: #fff;
-  --bs-navbar-brand-hover-color: #fff;
-  --bs-navbar-toggler-border-color: rgba(255, 255, 255, 0.1);
-}
-
-/* Logout uses .btn-link; keep it aligned with navbar link colors instead of --bs-link-color. */
-.navbar .btn-link {
-  --bs-btn-color: var(--bs-navbar-color);
-  --bs-btn-hover-color: var(--bs-navbar-hover-color);
-  --bs-btn-active-color: var(--bs-navbar-hover-color);
-  text-decoration: none;
 }
 
 /*
