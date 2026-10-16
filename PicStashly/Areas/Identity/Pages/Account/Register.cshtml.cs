@@ -38,10 +38,7 @@ public class RegisterModel(
         public string ConfirmPassword { get; set; } = string.Empty;
     }
 
-    public void OnGet(string? returnUrl = null)
-    {
-        ReturnUrl = returnUrl;
-    }
+    public void OnGet(string? returnUrl = null) => ReturnUrl = returnUrl;
 
     public async Task<IActionResult> OnPostAsync(string? returnUrl = null)
     {

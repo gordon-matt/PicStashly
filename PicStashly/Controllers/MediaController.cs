@@ -37,7 +37,7 @@ public class MediaController(IFileStorageService fileStorage, IUserContextServic
             return NotFound();
         }
 
-        bool isImagesOrThumbnails = segments[0] == Constants.FileStorage.Images || segments[0] == Constants.FileStorage.Thumbnails;
+        bool isImagesOrThumbnails = segments[0] is Constants.FileStorage.Images or Constants.FileStorage.Thumbnails;
         if (!isImagesOrThumbnails)
         {
             return NotFound();
@@ -51,16 +51,10 @@ public class MediaController(IFileStorageService fileStorage, IUserContextServic
         }
 
         string fullPath = fileStorage.GetFullPath(relativePath);
-        if (!System.IO.File.Exists(fullPath))
-        {
-            return NotFound();
-        }
-
-        if (!ContentTypeProvider.TryGetContentType(fullPath, out string? contentType))
-        {
-            return NotFound();
-        }
-
-        return PhysicalFile(fullPath, contentType, enableRangeProcessing: true);
+        return !System.IO.File.Exists(fullPath)
+            ? NotFound()
+            : !ContentTypeProvider.TryGetContentType(fullPath, out string? contentType)
+            ? NotFound()
+            : PhysicalFile(fullPath, contentType, enableRangeProcessing: true);
     }
 }

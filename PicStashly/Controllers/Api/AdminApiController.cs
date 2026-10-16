@@ -1,6 +1,5 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Identity;
-using PicStashly.Infrastructure;
 
 namespace PicStashly.Controllers.Api;
 

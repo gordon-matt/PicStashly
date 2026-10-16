@@ -2,7 +2,6 @@ using Microsoft.Extensions.Options;
 using OpenCvSharp;
 using Sdcb.PaddleInference;
 using Sdcb.PaddleOCR;
-using Sdcb.PaddleOCR.Models;
 using Sdcb.PaddleOCR.Models.Local;
 using SixLabors.ImageSharp.Formats.Png;
 using ImageSharpImage = SixLabors.ImageSharp.Image;
@@ -24,6 +23,7 @@ public sealed class OcrService : IOcrService, IDisposable
     // The queued engine is thread-safe and expensive to build (loads native libs + model), so it's
     // created once, lazily, and shared. A null engine after init means the native stack failed to load.
     private readonly object initLock = new();
+
     private bool initialized;
     private QueuedPaddleOcrAll? engine;
 
@@ -58,13 +58,13 @@ public sealed class OcrService : IOcrService, IDisposable
                 pngBytes = buffer.ToArray();
             }
 
-            using Mat src = Cv2.ImDecode(pngBytes, ImreadModes.Color);
+            using var src = Cv2.ImDecode(pngBytes, ImreadModes.Color);
             if (src.Empty())
             {
                 return null;
             }
 
-            PaddleOcrResult result = await ocr.Run(src);
+            var result = await ocr.Run(src);
             string text = result.Text?.Trim() ?? string.Empty;
             return string.IsNullOrWhiteSpace(text) ? null : text;
         }
@@ -120,8 +120,8 @@ public sealed class OcrService : IOcrService, IDisposable
 
     private QueuedPaddleOcrAll BuildEngine()
     {
-        FullOcrModel model = LocalFullModels.ChineseV5; // PP-OCRv5 multilingual (incl. English)
-        Action<PaddleConfig> device = ResolveDevice(options.Device);
+        var model = LocalFullModels.ChineseV5; // PP-OCRv5 multilingual (incl. English)
+        var device = ResolveDevice(options.Device);
         int? maxSize = options.DetectionMaxSize > 0 ? options.DetectionMaxSize : null;
 
         return new QueuedPaddleOcrAll(
