@@ -23,13 +23,10 @@ public class UserContextService(
     {
         get
         {
-            ClaimsPrincipal? httpUser = httpContextAccessor.HttpContext?.User;
-            if (httpUser?.Identity?.IsAuthenticated == true)
-            {
-                return httpUser;
-            }
-
-            return authenticationStateProvider.GetAuthenticationStateAsync().GetAwaiter().GetResult().User;
+            var httpUser = httpContextAccessor.HttpContext?.User;
+            return httpUser?.Identity?.IsAuthenticated == true
+                ? httpUser
+                : authenticationStateProvider.GetAuthenticationStateAsync().GetAwaiter().GetResult().User;
         }
     }
 }

@@ -20,8 +20,7 @@
 <div class="filter-bar">
     <div class="row g-2 align-items-center">
         <div class="col-12 col-md-2">
-            <input type="text" class="form-control" placeholder="Search filename, tags, text..."
-                   value="@searchQuery" @oninput="OnSearchInput" />
+            <SearchField Placeholder="Search filename, tags, text..." Value="@searchQuery" ValueChanged="OnSearchInput" />
         </div>
         <div class="col-12 col-md-2">
             <input type="text" class="form-control" placeholder="Filter by tags..." list="library-tag-suggestions"
@@ -293,9 +292,9 @@ else if (items.Count > 0)
         }
     }
 
-    private async Task OnSearchInput(ChangeEventArgs e)
+    private async Task OnSearchInput(string? value)
     {
-        searchQuery = e.Value?.ToString() ?? string.Empty;
+        searchQuery = value ?? string.Empty;
         int generation = ++searchGeneration;
         await Task.Delay(300);
         if (generation == searchGeneration)

@@ -1,6 +1,5 @@
 using Heroicsoft.NetForge.Abstractions.Navigation;
 using Heroicsoft.NetForge.Components.Bootstrap;
-using Heroicsoft.NetForge.Components.Shell;
 using LogVue;
 using Microsoft.AspNetCore.Http.Features;
 using PicStashly;
@@ -144,17 +143,17 @@ app.MapPost("/upload/share", async (HttpRequest request, IImageService imageServ
         return Results.Redirect("/upload");
     }
 
-    IFormCollection form = await request.ReadFormAsync();
-    List<IFormFile> files = form.Files.Where(file => file.Name == "images").ToList();
+    var form = await request.ReadFormAsync();
+    var files = form.Files.Where(file => file.Name == "images").ToList();
     if (files.Count == 0)
     {
         return Results.Redirect("/upload");
     }
 
     int? lastImageId = null;
-    foreach (IFormFile file in files)
+    foreach (var file in files)
     {
-        await using Stream stream = file.OpenReadStream();
+        await using var stream = file.OpenReadStream();
         var result = await imageService.IngestAsync(stream, file.FileName, sourceUrl: null, tagNames: null, categoryId: null, force: false);
         if (!result.IsSuccess)
         {

@@ -1,12 +1,13 @@
 global using Ardalis.Result;
-global using Ardalis.Result.AspNetCore;
 global using Extenso.Data.Entity;
 global using Heroicsoft.NetForge.Abstractions.Auth;
 global using Microsoft.AspNetCore.Authorization;
 global using Microsoft.AspNetCore.Mvc;
 global using Microsoft.EntityFrameworkCore;
 global using PicStashly.Data.Entities;
-global using PicStashly.Models.Requests;
-global using PicStashly.Models.Responses;
 global using PicStashly.Services.Abstractions;
+global using DialogService = Heroicsoft.NetForge.Components.Dialogs.DialogService;
+global using ForgeNavigationPlacement = Heroicsoft.NetForge.Components.Layout.ForgeNavigationPlacement;
+global using ForgeShellOptions = Heroicsoft.NetForge.Components.Layout.ForgeShellOptions;
 global using IUserContextService = PicStashly.Services.Abstractions.IUserContextService;
+global using ToastService = Heroicsoft.NetForge.Components.Toasts.ToastService;

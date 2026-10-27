@@ -38,48 +38,48 @@
             </div>
             <div class="col-12 col-lg-4">
                 <div class="mb-3">
-                    <label class="form-label fw-semibold d-flex justify-content-between align-items-center">
-                        File name
-                        <button type="button" class="btn btn-sm btn-outline-primary" disabled="@(!FileNameDirty)" @onclick="SaveFileName">
-                            <i class="bi bi-save"></i> Save
-                        </button>
-                    </label>
-                    <div class="input-group">
+                    <Field LabelClass="form-label fw-semibold d-flex justify-content-between align-items-center">
+<LabelContent>File name <button type="button" class="btn btn-sm btn-outline-primary" disabled="@(!FileNameDirty)" @onclick="SaveFileName"> <i class="bi bi-save"></i> Save </button></LabelContent>
+<ChildContent>
+<div class="input-group">
                         <input type="text" class="form-control" maxlength="512" @bind="fileNameBase" @bind:event="oninput" />
                         <span class="input-group-text">@fileExtension</span>
                     </div>
+</ChildContent>
+</Field>
                 </div>
 
                 <div class="mb-3">
-                    <label class="form-label fw-semibold">Tags</label>
-                    <input class="form-control" list="detail-tag-suggestions" placeholder="Add tags..."
+                    <Field Label="Tags" LabelClass="form-label fw-semibold">
+<input class="form-control" list="detail-tag-suggestions" placeholder="Add tags..."
                            @bind="tagsText" @bind:event="oninput" @onblur="SaveTags" />
+</Field>
                 </div>
 
                 <div class="mb-3">
-                    <label class="form-label fw-semibold">Category</label>
-                    <select class="form-select" @onchange="ChangeCategory">
+                    <Field Label="Category" LabelClass="form-label fw-semibold">
+<select class="form-select" @onchange="ChangeCategory">
                         <option value="" selected="@(image.CategoryId is null)">No category</option>
                         @foreach (var category in categories)
                         {
                             <option value="@category.Id" selected="@(image.CategoryId == category.Id)">@category.Name</option>
                         }
                     </select>
+</Field>
                 </div>
 
                 <div class="mb-3">
-                    <label class="form-label fw-semibold d-flex justify-content-between align-items-center">
-                        Extracted text (OCR)
-                        <button type="button" class="btn btn-sm btn-outline-primary" disabled="@(!OcrDirty)" @onclick="SaveOcr">
-                            <i class="bi bi-save"></i> Save
-                        </button>
-                    </label>
-                    <textarea class="form-control" rows="5"
+                    <Field LabelClass="form-label fw-semibold d-flex justify-content-between align-items-center">
+<LabelContent>Extracted text (OCR) <button type="button" class="btn btn-sm btn-outline-primary" disabled="@(!OcrDirty)" @onclick="SaveOcr"> <i class="bi bi-save"></i> Save </button></LabelContent>
+<ChildContent>
+<textarea class="form-control" rows="5"
                               placeholder="No text extracted — you can add/correct it here to make the image searchable"
                               @bind="ocrText" @bind:event="oninput"></textarea>
+</ChildContent>
+</Field>
                 </div>
 
-                <table class="table table-sm">
+                <Table Hover="false" Dense="true">
                     <tbody>
                         <tr>
                             <th scope="row">Dimensions</th>
@@ -111,7 +111,7 @@
                             </tr>
                         }
                     </tbody>
-                </table>
+                </Table>
 
                 <div class="d-flex gap-2">
                     <button type="button" class="btn btn-outline-primary" @onclick="CopyImage">

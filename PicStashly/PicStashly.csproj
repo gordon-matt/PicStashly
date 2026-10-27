@@ -20,18 +20,19 @@
 
 	<ItemGroup>
 		<PackageReference Include="Ardalis.Result.AspNetCore" Version="10.1.0" />
-		<PackageReference Include="Heroicsoft.NetForge.Authentication" Version="1.0.1" />
-		<PackageReference Include="Heroicsoft.NetForge.Components.Bootstrap" Version="1.0.2" />
-		<PackageReference Include="LogVue" Version="1.0.0" />
-		<PackageReference Include="Microsoft.AspNetCore.Authentication.OpenIdConnect" Version="10.0.12" />
-		<PackageReference Include="Microsoft.AspNetCore.Diagnostics.EntityFrameworkCore" Version="10.0.12" />
-		<PackageReference Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" Version="10.0.12" />
-		<PackageReference Include="Microsoft.AspNetCore.Identity.UI" Version="10.0.12" />
-		<PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.12">
+		<PackageReference Include="Heroicsoft.NetForge.Authentication" Version="1.1.0" />
+		<PackageReference Include="Heroicsoft.NetForge.Components.Bootstrap" Version="1.1.0" />
+		<PackageReference Include="LogVue" Version="1.1.1" />
+		<PackageReference Include="LogVue.Providers.Serilog" Version="1.1.1" />
+		<PackageReference Include="Microsoft.AspNetCore.Authentication.OpenIdConnect" Version="10.0.13" />
+		<PackageReference Include="Microsoft.AspNetCore.Diagnostics.EntityFrameworkCore" Version="10.0.13" />
+		<PackageReference Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" Version="10.0.13" />
+		<PackageReference Include="Microsoft.AspNetCore.Identity.UI" Version="10.0.13" />
+		<PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.13">
 			<PrivateAssets>all</PrivateAssets>
 			<IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
 		</PackageReference>
-		<PackageReference Include="Microsoft.EntityFrameworkCore.Tools" Version="10.0.12">
+		<PackageReference Include="Microsoft.EntityFrameworkCore.Tools" Version="10.0.13">
 			<PrivateAssets>all</PrivateAssets>
 			<IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
 		</PackageReference>
@@ -50,5 +51,4 @@
 		<ProjectReference Include="..\PicStashly.Models\PicStashly.Models.csproj" />
 		<ProjectReference Include="..\PicStashly.Services\PicStashly.Services.csproj" />
 	</ItemGroup>
-
 </Project>
