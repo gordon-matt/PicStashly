@@ -1,20 +1,57 @@
+@using System.Text.Json
+@using Microsoft.Extensions.Options
+@using Heroicsoft.NetForge.Components.Theming
+@inject IOptions<ForgeUiOptions> UiOptions
+@*
+    Layout for the embedded ASP.NET Identity UI. The app itself stays on Bootswatch, so this page
+    does not load theme-init.js: that script would read a Bootswatch name out of the shared
+    storage key and could write "light" or "dark" back over it. A short script only maps the
+    stored theme onto the nf light/dark scheme. With nothing stored, the page follows darkly,
+    which is what the app opens on.
+*@
+@{
+    const string siteName = "PicStashly";
+    var ui = UiOptions.Value;
+    string? accentCss = ForgeAccentCss.Build(ui);
+    string storageKey = Constants.ClientThemeLocalStorageKey;
+    const string defaultScheme = "dark";
+    string darkThemesJson = JsonSerializer.Serialize(Constants.BootswatchThemes.DarkColorScheme.ToArray());
+}
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="@defaultScheme">
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>@ViewData["Title"] - PicStashly</title>
-    <link id="theme-stylesheet" rel="stylesheet" href="~/lib/bootswatch/dist/darkly/bootstrap.min.css" />
-    <script src="~/js/theme-init.js"></script>
-    <link rel="stylesheet" href="~/lib/bootstrap-icons/font/bootstrap-icons.min.css" />
+    <title>@ViewData["Title"] - @siteName</title>
     <link rel="icon" type="image/png" href="~/img/Icon.png" />
+    <script>
+        (function () {
+            var dark = @Html.Raw(darkThemesJson);
+            var stored = null;
+            try { stored = localStorage.getItem(@Html.Raw(JsonSerializer.Serialize(storageKey))); } catch (e) { }
+            var name = stored ? String(stored).toLowerCase() : "";
+            var theme = name ? (dark.indexOf(name) >= 0 ? "dark" : "light") : @Html.Raw(JsonSerializer.Serialize(defaultScheme));
+            document.documentElement.setAttribute("data-theme", theme);
+        })();
+    </script>
+    <link rel="stylesheet" href="~/_content/Heroicsoft.NetForge.Components/css/nf.css" />
+    @if (accentCss is not null)
+    {
+        <style>@Html.Raw(accentCss)</style>
+    }
 </head>
 <body>
-    <div class="container py-4">
-        @RenderBody()
+    <div class="nf-standalone">
+        <div class="nf-standalone-body">
+            <div class="nf-auth-card">
+                <a class="nf-brand-link" href="/">
+                    <img class="nf-brand-logo nf-has-dark" src="~/img/Logo.png" alt="@siteName" />
+                    <img class="nf-brand-logo-dark" src="~/img/Logo-Light.png" alt="" />
+                </a>
+                @RenderBody()
+            </div>
+        </div>
     </div>
-    <script src="~/lib/jquery/dist/jquery.min.js"></script>
-    <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
     @await RenderSectionAsync("Scripts", required: false)
 </body>
 </html>

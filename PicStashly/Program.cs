@@ -1,5 +1,6 @@
 using Heroicsoft.NetForge.Abstractions.Navigation;
 using Heroicsoft.NetForge.Components.Bootstrap;
+using Heroicsoft.NetForge.Components.Theming;
 using LogVue;
 using Microsoft.AspNetCore.Http.Features;
 using PicStashly;
@@ -38,6 +39,12 @@ builder.Services.AddNetForgeBootstrapComponents(ui =>
     // theme-init.js uses darkly when nothing is stored. PicStashly.Constants.BootswatchThemes.Default
     // is sketchy, which is the list's documented name, not the theme the app actually opens on.
     ui.DefaultTheme = "darkly";
+});
+builder.Services.Configure<ForgeUiOptions>(ui =>
+{
+    // Pink from the wordmark. The sign-in page is the only nf surface; the app itself stays on Bootswatch.
+    ui.AccentColor = "#ec4899";
+    ui.AccentColorDark = "#f472b6";
 });
 builder.Services.Configure<ForgeShellOptions>(shell =>
 {

@@ -4,18 +4,6 @@
     ViewData["Title"] = "Registration submitted";
 }
 
-<div class="row justify-content-center">
-    <div class="col-md-6 text-center py-5">
-        <div class="mb-4">
-            <i class="bi bi-hourglass-split text-warning" style="font-size: 4rem;"></i>
-        </div>
-        <h3 class="mb-3">Registration submitted</h3>
-        <p class="text-muted">
-            Your account has been created and is <strong>pending admin approval</strong>.
-            You'll be able to log in once an administrator approves your account.
-        </p>
-        <a asp-page="./Login" class="btn btn-primary mt-3">
-            <i class="bi bi-box-arrow-in-right"></i> Go to login
-        </a>
-    </div>
-</div>
+<h1>@ViewData["Title"]</h1>
+<p class="nf-hint">Your account has been created and is pending admin approval. You'll be able to sign in once an administrator approves it.</p>
+<p class="nf-hint"><a asp-page="./Login">Back to sign in</a></p>
