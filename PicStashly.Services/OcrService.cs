@@ -1,10 +1,9 @@
+using Heroicsoft.NetForge.Drawing;
 using Microsoft.Extensions.Options;
 using OpenCvSharp;
 using Sdcb.PaddleInference;
 using Sdcb.PaddleOCR;
 using Sdcb.PaddleOCR.Models.Local;
-using SixLabors.ImageSharp.Formats.Png;
-using ImageSharpImage = SixLabors.ImageSharp.Image;
 using LogLevel = Microsoft.Extensions.Logging.LogLevel;
 
 namespace PicStashly.Services;
@@ -19,6 +18,7 @@ public sealed class OcrService : IOcrService, IDisposable
 {
     private readonly OcrOptions options;
     private readonly ILogger<OcrService> logger;
+    private readonly IImageProcessor images;
 
     // The queued engine is thread-safe and expensive to build (loads native libs + model), so it's
     // created once, lazily, and shared. A null engine after init means the native stack failed to load.
@@ -27,10 +27,11 @@ public sealed class OcrService : IOcrService, IDisposable
     private bool initialized;
     private QueuedPaddleOcrAll? engine;
 
-    public OcrService(IOptions<OcrOptions> ocrOptions, ILogger<OcrService> logger)
+    public OcrService(IOptions<OcrOptions> ocrOptions, ILogger<OcrService> logger, IImageProcessor images)
     {
         options = ocrOptions.Value;
         this.logger = logger;
+        this.images = images;
     }
 
     public async Task<string?> ExtractTextAsync(string fullPath, CancellationToken cancellationToken = default)
@@ -48,15 +49,10 @@ public sealed class OcrService : IOcrService, IDisposable
 
         try
         {
-            // Re-encode through ImageSharp to PNG bytes first: it handles every format we ingest
+            // Re-encode to PNG bytes first: it handles every format we ingest
             // (incl. webp/gif) consistently, sidestepping gaps in OpenCV's built-in image codecs.
-            byte[] pngBytes;
-            using (var image = await ImageSharpImage.LoadAsync(fullPath, cancellationToken))
-            using (var buffer = new MemoryStream())
-            {
-                await image.SaveAsync(buffer, new PngEncoder(), cancellationToken);
-                pngBytes = buffer.ToArray();
-            }
+            var processed = await images.TranscodeAsync(fullPath, new ImageEncode(RasterFormat.Png), cancellationToken);
+            byte[] pngBytes = processed.Bytes;
 
             using var src = Cv2.ImDecode(pngBytes, ImreadModes.Color);
             if (src.Empty())

@@ -1,18 +1,13 @@
 using System.Text;
+using Heroicsoft.NetForge.Drawing;
 using Microsoft.Extensions.Options;
-using SixLabors.ImageSharp;
-using SixLabors.ImageSharp.Formats;
-using SixLabors.ImageSharp.Formats.Bmp;
-using SixLabors.ImageSharp.Formats.Gif;
-using SixLabors.ImageSharp.Formats.Jpeg;
-using SixLabors.ImageSharp.Formats.Png;
-using SixLabors.ImageSharp.Formats.Webp;
-using SixLabors.ImageSharp.Processing;
-using ImageSharpImage = SixLabors.ImageSharp.Image;
 
 namespace PicStashly.Services;
 
-public class FileStorageService(IConfiguration configuration, IOptions<ImageProcessingOptions> imageOptions) : IFileStorageService
+public class FileStorageService(
+    IConfiguration configuration,
+    IOptions<ImageProcessingOptions> imageOptions,
+    IImageProcessor images) : IFileStorageService
 {
     private const string UncategorizedFolder = "uncategorized";
     private const string ReservationExtension = ".reserved";
@@ -70,24 +65,42 @@ public class FileStorageService(IConfiguration configuration, IOptions<ImageProc
             string storageRelative = $"{Constants.FileStorage.Images}/{categoryFolder}/{fileBaseName}{extension}";
             string storageFull = GetFullPath(storageRelative);
 
-            using var image = await ImageSharpImage.LoadAsync(buffer, cancellationToken);
-            int width = image.Width;
-            int height = image.Height;
+            var info = await images.TryIdentifyAsync(buffer, cancellationToken);
+            if (info is null)
+            {
+                throw new RasterDecodeException("The file is not a valid image.");
+            }
+
+            int width = info.Width;
+            int height = info.Height;
 
             bool needsResize = opts.AutoShrinkImages && (width > opts.MaxWidth || height > opts.MaxHeight);
+            ProcessedImage? resized = null;
             if (needsResize)
             {
                 // Resize preserves the original format (and animation frames for GIF/WebP).
-                image.Mutate(x => x.Resize(new ResizeOptions
+                resized = await images.ResizeAsync(buffer, new ImageTransform
                 {
-                    Mode = ResizeMode.Max,
-                    Size = new Size(opts.MaxWidth, opts.MaxHeight)
-                }));
+                    Width = opts.MaxWidth,
+                    Height = opts.MaxHeight,
+                    Mode = ImageScaleMode.Max,
+                    Format = ImageFormats.FromExtension(extension),
+                    Quality = opts.Quality,
+                }, cancellationToken);
 
-                width = image.Width;
-                height = image.Height;
+                width = resized.Width;
+                height = resized.Height;
+            }
 
-                await image.SaveAsync(storageFull, GetEncoder(extension, opts.Quality), cancellationToken);
+            // Decode the thumbnail before writing the original so a bad file throws
+            // RasterDecodeException without leaving an image behind.
+            var thumbnail = resized is null
+                ? await images.ResizeAsync(buffer, ThumbnailTransform(opts), cancellationToken)
+                : await images.ResizeAsync(resized.Bytes, ThumbnailTransform(opts), cancellationToken);
+
+            if (resized is not null)
+            {
+                await File.WriteAllBytesAsync(storageFull, resized.Bytes, cancellationToken);
             }
             else
             {
@@ -97,7 +110,7 @@ public class FileStorageService(IConfiguration configuration, IOptions<ImageProc
                 await buffer.CopyToAsync(fs, cancellationToken);
             }
 
-            string thumbnailRelative = await GenerateThumbnailAsync(image, fileBaseName, categoryFolder, cancellationToken);
+            string thumbnailRelative = await WriteThumbnailAsync(thumbnail.Bytes, fileBaseName, categoryFolder, cancellationToken);
 
             long fileSize = new FileInfo(storageFull).Length;
 
@@ -124,8 +137,9 @@ public class FileStorageService(IConfiguration configuration, IOptions<ImageProc
         string fileBaseName = Path.GetFileNameWithoutExtension(storagePath);
         string categoryFolder = GetSubfolderFromPath(storagePath);
 
-        using var image = await ImageSharpImage.LoadAsync(fullPath, cancellationToken);
-        return await GenerateThumbnailAsync(image, fileBaseName, categoryFolder, cancellationToken);
+        var opts = imageOptions.Value;
+        var thumbnail = await images.ResizeAsync(fullPath, ThumbnailTransform(opts), cancellationToken);
+        return await WriteThumbnailAsync(thumbnail.Bytes, fileBaseName, categoryFolder, cancellationToken);
     }
 
     public Task<(string StoragePath, string ThumbnailPath)> MoveToCategoryAsync(
@@ -238,42 +252,25 @@ public class FileStorageService(IConfiguration configuration, IOptions<ImageProc
         return sb.ToString();
     }
 
-    private async Task<string> GenerateThumbnailAsync(ImageSharpImage image, string fileBaseName, string categoryFolder, CancellationToken cancellationToken)
+    private static ImageTransform ThumbnailTransform(ImageProcessingOptions opts) => new()
     {
-        var opts = imageOptions.Value;
+        Width = opts.ThumbnailWidth,
+        Height = opts.ThumbnailHeight,
+        Mode = ImageScaleMode.Max,
+        Format = RasterFormat.Webp,
+        Quality = opts.ThumbnailQuality,
+    };
 
+    private async Task<string> WriteThumbnailAsync(byte[] bytes, string fileBaseName, string categoryFolder, CancellationToken cancellationToken)
+    {
         // WebP thumbnails: small, and unlike JPEG they keep transparency intact.
         string thumbnailRelative = $"{Constants.FileStorage.Thumbnails}/{categoryFolder}/{fileBaseName}.webp";
         string thumbnailFull = GetFullPath(thumbnailRelative);
         Directory.CreateDirectory(Path.GetDirectoryName(thumbnailFull)!);
-
-        using var thumbnail = image.Clone(x => x.Resize(new ResizeOptions
-        {
-            Mode = ResizeMode.Max,
-            Size = new Size(opts.ThumbnailWidth, opts.ThumbnailHeight)
-        }));
-
-        await thumbnail.SaveAsync(thumbnailFull, new WebpEncoder { Quality = opts.ThumbnailQuality }, cancellationToken);
+        await File.WriteAllBytesAsync(thumbnailFull, bytes, cancellationToken);
         return thumbnailRelative;
     }
 
-    private static ImageEncoder GetEncoder(string extension, int quality) => extension switch
-    {
-        ".jpg" or ".jpeg" => new JpegEncoder { Quality = quality },
-        ".png" => new PngEncoder(),
-        ".gif" => new GifEncoder(),
-        ".webp" => new WebpEncoder { Quality = quality },
-        ".bmp" => new BmpEncoder(),
-        _ => new JpegEncoder { Quality = quality }
-    };
-
-    public static string GetContentType(string extension) => extension.ToLowerInvariant() switch
-    {
-        ".jpg" or ".jpeg" => "image/jpeg",
-        ".png" => "image/png",
-        ".gif" => "image/gif",
-        ".webp" => "image/webp",
-        ".bmp" => "image/bmp",
-        _ => "application/octet-stream"
-    };
+    public static string GetContentType(string extension) =>
+        ImageFormats.ToContentType(ImageFormats.FromExtension(extension));
 }

@@ -1,3 +1,4 @@
+using Heroicsoft.NetForge.Drawing;
 using Microsoft.Extensions.Options;
 
 namespace PicStashly.Services;
@@ -179,7 +180,7 @@ public class ImageService(
             var saved = await FindWithTagsAsync(image.Id, userId);
             return Result.Success(IngestResult.Saved(MapToDetail(saved!)));
         }
-        catch (SixLabors.ImageSharp.ImageFormatException)
+        catch (RasterDecodeException)
         {
             CleanUpStoredFiles(stored);
             return Result.Invalid([new ValidationError("FileName", "The file is not a valid image")]);

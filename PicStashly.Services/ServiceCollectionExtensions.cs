@@ -1,3 +1,4 @@
+using Heroicsoft.NetForge.Drawing;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace PicStashly.Services;
@@ -8,6 +9,8 @@ public static class ServiceCollectionExtensions
     {
         public IServiceCollection AddPicStashlyServices(IConfiguration configuration)
         {
+            services.AddNetForgeDrawing();
+
             services.Configure<ImageProcessingOptions>(configuration.GetSection("ImageProcessing"));
             services.Configure<UploadOptions>(configuration.GetSection("Upload"));
             services.Configure<OcrOptions>(configuration.GetSection("Ocr"));
