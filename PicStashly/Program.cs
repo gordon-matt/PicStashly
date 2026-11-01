@@ -1,4 +1,5 @@
 using Heroicsoft.NetForge.Abstractions.Navigation;
+using Heroicsoft.NetForge.Components;
 using Heroicsoft.NetForge.Components.Bootstrap;
 using Heroicsoft.NetForge.Components.Theming;
 using LogVue;
@@ -52,6 +53,9 @@ builder.Services.Configure<ForgeShellOptions>(shell =>
     shell.BrandHref = "/";
     shell.LogoUrl = "img/Logo.png";
     shell.LogoDarkUrl = "img/Logo-Light.png";
+    shell.UseSharedMenu = true;
+    shell.SharedMenuName = "Admin";
+    shell.SharedMenuAfterSections = true;
     shell.NavigationPlacement = ForgeNavigationPlacement.Topbar;
     shell.Version = typeof(Program).Assembly.GetName().Version?.ToString(3);
     shell.Sections =
@@ -72,10 +76,15 @@ builder.Services.Configure<ForgeShellOptions>(shell =>
             Items =
             [
                 new ForgeNavItem { Title = "Admin", Href = "/admin", Icon = "gear" },
-                new ForgeNavItem { Title = "Logs", Href = "/logvue", Icon = "journal-text", External = true },
             ],
         },
     ];
+});
+builder.Services.BuildMenu("Admin", menu =>
+{
+    menu.AddItems(group => group.Roles = WellKnownRoles.Administrator)
+        .AsTopbar()
+        .AddLogVue(options => options.Title = "Logs");
 });
 
 // Set "Authentication:Provider" to "Keycloak" to use Keycloak instead of the built-in ASP.NET Core

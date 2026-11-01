@@ -9,7 +9,7 @@
 		<!-- The Bootstrap shell is a project reference outside this solution, so the image
 		     context is the SelfHosted folder (the parent of PicStashly and Heroicsoft.NetForge). -->
 		<DockerfileContext>..\..</DockerfileContext>
-		<Version>1.1.1</Version>
+		<Version>1.1.2</Version>
 		<!--
 		  LogVue's dashboard needs the framework's blazor.web.js. The Web SDK only restores that
 		  file when this property is set on the host, and package props are not imported during
@@ -20,11 +20,11 @@
 
 	<ItemGroup>
 		<PackageReference Include="Ardalis.Result.AspNetCore" Version="10.1.0" />
-		<PackageReference Include="Heroicsoft.NetForge.Authentication" Version="1.1.0" />
-		<PackageReference Include="Heroicsoft.NetForge.Components" Version="1.1.1" />
-		<PackageReference Include="Heroicsoft.NetForge.Components.Bootstrap" Version="1.1.0" />
-		<PackageReference Include="LogVue" Version="1.1.1" />
-		<PackageReference Include="LogVue.Providers.Serilog" Version="1.1.1" />
+		<PackageReference Include="Heroicsoft.NetForge.Authentication" Version="1.2.0" />
+		<PackageReference Include="Heroicsoft.NetForge.Components" Version="1.2.0" />
+		<PackageReference Include="Heroicsoft.NetForge.Components.Bootstrap" Version="1.2.0" />
+		<PackageReference Include="LogVue" Version="1.1.2" />
+		<PackageReference Include="LogVue.Providers.Serilog" Version="1.1.2" />
 		<PackageReference Include="Microsoft.AspNetCore.Authentication.OpenIdConnect" Version="10.0.14" />
 		<PackageReference Include="Microsoft.AspNetCore.Diagnostics.EntityFrameworkCore" Version="10.0.14" />
 		<PackageReference Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" Version="10.0.14" />
