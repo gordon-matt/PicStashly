@@ -41,6 +41,8 @@ builder.Services.AddNetForgeBootstrapComponents(ui =>
     // is sketchy, which is the list's documented name, not the theme the app actually opens on.
     ui.DefaultTheme = "darkly";
 });
+
+builder.Services.ConfigureNetForgeToastSounds(sounds => sounds.EnableSounds = true);
 builder.Services.Configure<ForgeUiOptions>(ui =>
 {
     // Pink from the wordmark. The sign-in page is the only nf surface; the app itself stays on Bootswatch.
