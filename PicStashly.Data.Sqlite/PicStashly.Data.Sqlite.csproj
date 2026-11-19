@@ -8,7 +8,7 @@
 	</PropertyGroup>
 
 	<ItemGroup>
-		<PackageReference Include="LogVue.Data.Sqlite" Version="1.1.2" />
+		<PackageReference Include="LogVue.Data.Sqlite" Version="1.1.6" />
 		<PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="10.0.14" />
 		<PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.14">
 			<PrivateAssets>all</PrivateAssets>

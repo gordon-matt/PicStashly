@@ -144,6 +144,8 @@ app.UseAntiforgery();
 
 app.MapStaticAssets();
 
+app.MapNetForgeAssets();
+
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode()
     .WithStaticAssets();
