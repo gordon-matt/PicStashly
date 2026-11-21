@@ -29,6 +29,9 @@ ENV LD_LIBRARY_PATH="/app/runtimes/linux-x64/native:/app/bin/Debug/net10.0/runti
 FROM mcr.microsoft.com/dotnet/sdk:10.0-noble AS build
 ARG BUILD_CONFIGURATION=Release
 WORKDIR /src
+# Package versions live in Directory.Packages.props. Restore cannot see them
+# until this file is in the image, and the project files no longer repeat them.
+COPY ["Directory.Packages.props", "Directory.Build.props", "./"]
 # Copy every csproj the web app references so `dotnet restore` can resolve the full
 # project graph before the rest of the source is copied (keeps the restore layer cached).
 COPY ["PicStashly/PicStashly.csproj", "PicStashly/"]

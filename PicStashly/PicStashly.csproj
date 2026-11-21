@@ -9,7 +9,6 @@
 		<!-- The Bootstrap shell is a project reference outside this solution, so the image
 		     context is the SelfHosted folder (the parent of PicStashly and Heroicsoft.NetForge). -->
 		<DockerfileContext>..\..</DockerfileContext>
-		<Version>1.1.2</Version>
 		<!--
 		  LogVue's dashboard needs the framework's blazor.web.js. The Web SDK only restores that
 		  file when this property is set on the host, and package props are not imported during
@@ -19,27 +18,27 @@
 	</PropertyGroup>
 
 	<ItemGroup>
-		<PackageReference Include="Ardalis.Result.AspNetCore" Version="10.1.0" />
-		<PackageReference Include="Heroicsoft.NetForge.Authentication" Version="1.2.6" />
-		<PackageReference Include="Heroicsoft.NetForge.Components" Version="1.2.6" />
-		<PackageReference Include="Heroicsoft.NetForge.Components.Bootstrap" Version="1.2.6" />
-		<PackageReference Include="LogVue" Version="1.1.6" />
-		<PackageReference Include="LogVue.Providers.Serilog" Version="1.1.6" />
-		<PackageReference Include="Microsoft.AspNetCore.Authentication.OpenIdConnect" Version="10.0.14" />
-		<PackageReference Include="Microsoft.AspNetCore.Diagnostics.EntityFrameworkCore" Version="10.0.14" />
-		<PackageReference Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" Version="10.0.14" />
-		<PackageReference Include="Microsoft.AspNetCore.Identity.UI" Version="10.0.14" />
-		<PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.14">
+		<PackageReference Include="Ardalis.Result.AspNetCore" />
+		<PackageReference Include="Heroicsoft.NetForge.Authentication" />
+		<PackageReference Include="Heroicsoft.NetForge.Components" />
+		<PackageReference Include="Heroicsoft.NetForge.Components.Bootstrap" />
+		<PackageReference Include="LogVue" />
+		<PackageReference Include="LogVue.Providers.Serilog" />
+		<PackageReference Include="Microsoft.AspNetCore.Authentication.OpenIdConnect" />
+		<PackageReference Include="Microsoft.AspNetCore.Diagnostics.EntityFrameworkCore" />
+		<PackageReference Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" />
+		<PackageReference Include="Microsoft.AspNetCore.Identity.UI" />
+		<PackageReference Include="Microsoft.EntityFrameworkCore.Design">
 			<PrivateAssets>all</PrivateAssets>
 			<IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
 		</PackageReference>
-		<PackageReference Include="Microsoft.EntityFrameworkCore.Tools" Version="10.0.14">
+		<PackageReference Include="Microsoft.EntityFrameworkCore.Tools">
 			<PrivateAssets>all</PrivateAssets>
 			<IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
 		</PackageReference>
-		<PackageReference Include="Microsoft.VisualStudio.Azure.Containers.Tools.Targets" Version="1.23.0" />
-		<PackageReference Include="Microsoft.Web.LibraryManager.Build" Version="3.0.114" />
-		<PackageReference Include="Serilog.AspNetCore" Version="10.0.0" />
+		<PackageReference Include="Microsoft.VisualStudio.Azure.Containers.Tools.Targets" />
+		<PackageReference Include="Microsoft.Web.LibraryManager.Build" />
+		<PackageReference Include="Serilog.AspNetCore" />
 	</ItemGroup>
 
 	<ItemGroup>
